@@ -1,98 +1,73 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useEffect, useState } from 'react'
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
+import { supabase } from '@/lib/supabase'
+import { AnbieterHome } from '@/components/AnbieterHome'
+import { AuftraggeberHome } from '@/components/AuftraggeberHome'
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+const C = { bg: '#f5f0e8', primary: '#3a5a3e', text: '#1a1a18', muted: '#6b6b60' }
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
-
+// Rollen-Weiche: nach dem Login entscheidet profiles.rolle, welcher Home-Screen erscheint.
 export default function HomeScreen() {
+  const [rolle, setRolle] = useState<string | null | undefined>(undefined)
+
+  useEffect(() => {
+    let aktiv = true
+    ;(async () => {
+      const { data: sess } = await supabase.auth.getSession()
+      const userId = sess.session?.user.id
+      if (!userId) {
+        if (aktiv) setRolle(null)
+        return
+      }
+      const { data } = await supabase.from('profiles').select('rolle').eq('id', userId).single()
+      if (aktiv) setRolle((data?.rolle as string) ?? null)
+    })()
+    return () => {
+      aktiv = false
+    }
+  }, [])
+
+  if (rolle === undefined) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator color={C.primary} size="large" />
+      </View>
+    )
+  }
+
+  if (rolle === 'anbieter') return <AnbieterHome />
+  if (rolle === 'auftraggeber') return <AuftraggeberHome />
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
-  );
+    <View style={styles.center}>
+      <Text style={styles.title}>Konto nicht zugeordnet</Text>
+      <Text style={styles.text}>
+        Diese App ist für Anbieter und Auftraggeber. Bitte nutze die Web-Plattform unter vergabo.de.
+      </Text>
+      <Pressable style={styles.button} onPress={() => supabase.auth.signOut()}>
+        <Text style={styles.buttonText}>Abmelden</Text>
+      </Pressable>
+    </View>
+  )
 }
 
 const styles = StyleSheet.create({
-  container: {
+  center: {
     flex: 1,
     justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
     alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
+    backgroundColor: C.bg,
+    padding: 24,
+    gap: 12,
   },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+  title: { fontSize: 18, fontWeight: '700', color: C.text },
+  text: { fontSize: 14, color: C.muted, textAlign: 'center', lineHeight: 20 },
+  button: {
+    marginTop: 8,
+    backgroundColor: C.primary,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
   },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
-});
+  buttonText: { color: '#ffffff', fontSize: 15, fontWeight: '600' },
+})
