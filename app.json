@@ -48,6 +48,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "36bb5ba6-6445-4ae5-ac40-0c9785b538c9"
+      }
+    },
+    "owner": "vergabo"
   }
 }
