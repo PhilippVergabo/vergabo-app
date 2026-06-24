@@ -24,6 +24,9 @@ function Chip({ label, aktiv, onPress }: { label: string; aktiv: boolean; onPres
     <Pressable
       style={[styles.chip, aktiv ? styles.chipAktiv : styles.chipInaktiv]}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: aktiv }}
+      accessibilityLabel={`Filter ${label}`}
     >
       <Text style={[styles.chipText, aktiv ? styles.chipTextAktiv : styles.chipTextInaktiv]}>
         {label}
@@ -129,14 +132,16 @@ export function AnbieterHome() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Ausschreibungen</Text>
-        <Pressable onPress={abmeldenMitBestaetigung} hitSlop={8}>
+        <Pressable onPress={abmeldenMitBestaetigung} hitSlop={8} accessibilityRole="button">
           <Text style={styles.logout}>Abmelden</Text>
         </Pressable>
       </View>
 
       <View style={styles.filterBar}>
         <View style={styles.searchRow}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Text style={styles.searchIcon} importantForAccessibility="no" accessibilityElementsHidden>
+            🔍
+          </Text>
           <TextInput
             style={styles.searchInput}
             value={suche}
@@ -148,7 +153,12 @@ export function AnbieterHome() {
             returnKeyType="search"
           />
           {suche.length > 0 ? (
-            <Pressable onPress={() => setSuche('')} hitSlop={8}>
+            <Pressable
+              onPress={() => setSuche('')}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Suche löschen"
+            >
               <Text style={styles.clearText}>✕</Text>
             </Pressable>
           ) : null}

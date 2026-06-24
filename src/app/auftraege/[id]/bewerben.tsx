@@ -460,6 +460,9 @@ export default function BewerbenScreen() {
                     onPress={() =>
                       setEignungsbestaetigung((prev) => ({ ...prev, [k.id]: !prev[k.id] }))
                     }
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked }}
+                    accessibilityLabel={k.text}
                   >
                     <Text style={checked ? styles.checkOk : styles.checkEmpty}>{checked ? '✓' : '○'}</Text>
                     <Text style={styles.kriteriumText}>
@@ -493,6 +496,9 @@ export default function BewerbenScreen() {
                           prev.map((b, j) => (j === i ? !b : b)),
                         )
                       }
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked }}
+                      accessibilityLabel={v.titel}
                     >
                       <Text style={checked ? styles.checkOk : styles.checkEmpty}>
                         {checked ? '✓' : '○'}
@@ -591,6 +597,8 @@ export default function BewerbenScreen() {
           style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
           onPress={handleSubmit}
           disabled={!canSubmit}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !canSubmit, busy: submitting }}
         >
           <Text style={styles.submitText}>{submitting ? 'Wird eingereicht …' : 'Angebot einreichen'}</Text>
         </Pressable>

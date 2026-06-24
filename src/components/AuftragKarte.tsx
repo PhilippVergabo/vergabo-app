@@ -42,10 +42,26 @@ export function AuftragKarte({ auftrag, beworben, angebotPreis, onPress }: Props
   const frist = formatDate(auftrag.frist)
   const ort = [auftrag.ausfuehrungsort_plz, auftrag.ausfuehrungsort_ort].filter(Boolean).join(' ')
 
+  // Karteninhalt zu einer Vorlese-Beschriftung zusammenfassen (Screenreader liest
+  // die Karte als eine Einheit statt als lose Einzeltexte).
+  const a11yLabel = [
+    `Ausschreibung: ${auftrag.titel}`,
+    auftrag.gewerk ? gewerkLabel(auftrag.gewerk) : null,
+    ort ? `Ort ${ort}` : null,
+    frist ? `Frist ${frist}` : null,
+    budget ? `Budget ${budget}` : null,
+    beworben ? 'Bereits beworben' : null,
+  ]
+    .filter(Boolean)
+    .join(', ')
+
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={a11yLabel}
+      accessibilityHint="Öffnet die Details der Ausschreibung"
     >
       <View style={styles.titleRow}>
         <Text style={styles.titel} numberOfLines={2}>

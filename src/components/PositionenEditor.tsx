@@ -70,7 +70,13 @@ export function PositionenEditor({ initialPositionen, onChange }: Props) {
               placeholderTextColor={C.muted}
               onChangeText={(t) => updatePosition(p.id, 'beschreibung', t)}
             />
-            <Pressable onPress={() => loeschen(p.id)} hitSlop={8} style={styles.del}>
+            <Pressable
+              onPress={() => loeschen(p.id)}
+              hitSlop={8}
+              style={styles.del}
+              accessibilityRole="button"
+              accessibilityLabel="Position löschen"
+            >
               <Text style={styles.delText}>✕</Text>
             </Pressable>
           </View>
@@ -111,7 +117,7 @@ export function PositionenEditor({ initialPositionen, onChange }: Props) {
         </View>
       ))}
 
-      <Pressable onPress={hinzufuegen} hitSlop={6}>
+      <Pressable onPress={hinzufuegen} hitSlop={6} accessibilityRole="button">
         <Text style={styles.add}>+ Weitere Position hinzufügen</Text>
       </Pressable>
 

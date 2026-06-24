@@ -124,6 +124,7 @@ export default function AuftragDetailScreen() {
               <Pressable
                 style={styles.ctaButton}
                 onPress={() => router.push(`/auftraege/${auftrag.id}/bearbeiten`)}
+                accessibilityRole="button"
               >
                 <Text style={styles.ctaButtonText}>Angebot bearbeiten</Text>
               </Pressable>
@@ -133,6 +134,7 @@ export default function AuftragDetailScreen() {
           <Pressable
             style={styles.ctaButton}
             onPress={() => router.push(`/auftraege/${auftrag.id}/bewerben`)}
+            accessibilityRole="button"
           >
             <Text style={styles.ctaButtonText}>Angebot abgeben</Text>
           </Pressable>

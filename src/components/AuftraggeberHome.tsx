@@ -182,12 +182,17 @@ export function AuftraggeberHome() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Meine Ausschreibungen</Text>
-        <Pressable onPress={abmeldenMitBestaetigung} hitSlop={8}>
+        <Pressable onPress={abmeldenMitBestaetigung} hitSlop={8} accessibilityRole="button">
           <Text style={styles.logout}>Abmelden</Text>
         </Pressable>
       </View>
       {istAdmin ? (
-        <Pressable style={styles.adminRow} onPress={() => router.push('/admin')}>
+        <Pressable
+          style={styles.adminRow}
+          onPress={() => router.push('/admin')}
+          accessibilityRole="button"
+          accessibilityLabel="Admin – Anbieter verifizieren"
+        >
           <Text style={styles.adminRowText}>🛡️ Admin – Anbieter verifizieren</Text>
         </Pressable>
       ) : null}
