@@ -8,9 +8,10 @@ import {
   Text,
   View,
 } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useRouter, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
+import { abmeldenMitBestaetigung } from '@/lib/auth'
 import { API_URL } from '@/lib/config'
 import { gewerkLabel } from '@/lib/labels'
 import { C } from '@/lib/theme'
@@ -148,19 +149,24 @@ export function AuftraggeberHome() {
     setCounts(next)
   }, [])
 
-  useEffect(() => {
-    loadData().finally(() => setLoading(false))
-  }, [loadData])
+  // Bei jedem Fokus neu laden, damit Status und Bewerbungszahlen aktuell sind.
+  useFocusEffect(
+    useCallback(() => {
+      let aktiv = true
+      loadData().finally(() => {
+        if (aktiv) setLoading(false)
+      })
+      return () => {
+        aktiv = false
+      }
+    }, [loadData]),
+  )
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
     await loadData()
     setRefreshing(false)
   }, [loadData])
-
-  async function handleLogout() {
-    await supabase.auth.signOut()
-  }
 
   const gesamtBewerbungen = auftraege.reduce((s, a) => s + (counts.get(a.id) ?? 0), 0)
 
@@ -176,7 +182,7 @@ export function AuftraggeberHome() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Meine Ausschreibungen</Text>
-        <Pressable onPress={handleLogout} hitSlop={8}>
+        <Pressable onPress={abmeldenMitBestaetigung} hitSlop={8}>
           <Text style={styles.logout}>Abmelden</Text>
         </Pressable>
       </View>

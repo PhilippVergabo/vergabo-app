@@ -10,9 +10,10 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import { useRouter, type Href } from 'expo-router'
+import { useRouter, useFocusEffect, type Href } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
+import { abmeldenMitBestaetigung } from '@/lib/auth'
 import { AuftragKarte, type AuftragItem } from '@/components/AuftragKarte'
 import { addPushTapListener, registriereFuerPush } from '@/lib/push'
 import { gewerkLabel } from '@/lib/labels'
@@ -90,9 +91,19 @@ export function AnbieterHome() {
     setMeineAngebote(angebote)
   }, [])
 
-  useEffect(() => {
-    loadData().finally(() => setLoading(false))
-  }, [loadData])
+  // Bei jedem Fokus neu laden, damit der "Beworben"-Status nach dem Einreichen
+  // sofort erscheint (nicht erst nach manuellem Pull-to-Refresh).
+  useFocusEffect(
+    useCallback(() => {
+      let aktiv = true
+      loadData().finally(() => {
+        if (aktiv) setLoading(false)
+      })
+      return () => {
+        aktiv = false
+      }
+    }, [loadData]),
+  )
 
   // Push-Registrierung (Token speichern) + Tap-Navigation zur Ausschreibung.
   // No-op in Expo Go / ohne Berechtigung — greift erst im Dev-/EAS-Build.
@@ -107,12 +118,7 @@ export function AnbieterHome() {
     setRefreshing(false)
   }, [loadData])
 
-  async function handleLogout() {
-    await supabase.auth.signOut()
-  }
-
-  if (loading) {
-    return (
+  if (loading) {    return (
       <View style={styles.center}>
         <ActivityIndicator color={C.primary} size="large" />
       </View>
@@ -123,7 +129,7 @@ export function AnbieterHome() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Ausschreibungen</Text>
-        <Pressable onPress={handleLogout} hitSlop={8}>
+        <Pressable onPress={abmeldenMitBestaetigung} hitSlop={8}>
           <Text style={styles.logout}>Abmelden</Text>
         </Pressable>
       </View>
