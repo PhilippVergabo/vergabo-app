@@ -1,16 +1,7 @@
 import { useState } from 'react'
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { EINHEITEN, fmtPreis, type Position } from '@/lib/bewerbung'
-
-const C = {
-  primary: '#3a5a3e',
-  accent: '#c87941',
-  text: '#1a1a18',
-  muted: '#6b6b60',
-  border: '#ddd8cc',
-  field: '#f5f0e8',
-  card: '#ffffff',
-}
+import { C } from '@/lib/theme'
 
 const defaultPositionen: Position[] = [
   { id: '1', beschreibung: 'Arbeitszeit', menge: 1, einheit: 'Stunden', einzelpreis: 0, gesamt: 0 },

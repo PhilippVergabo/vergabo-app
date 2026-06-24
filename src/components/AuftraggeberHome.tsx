@@ -11,29 +11,9 @@ import {
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://www.vergabo.de'
-
-const C = {
-  bg: '#f5f0e8',
-  primary: '#3a5a3e',
-  accent: '#c87941',
-  text: '#1a1a18',
-  muted: '#6b6b60',
-  border: '#ddd8cc',
-  card: '#ffffff',
-}
-
-const GEWERK_LABELS: Record<string, string> = {
-  malerarbeiten: 'Malerarbeiten',
-  sanitaer: 'Sanitär',
-  elektro: 'Elektro',
-  schreiner: 'Schreiner',
-  dachdecker: 'Dachdecker',
-  garten: 'Garten',
-  reinigung: 'Reinigung',
-  sonstiges: 'Sonstiges',
-}
+import { API_URL } from '@/lib/config'
+import { gewerkLabel } from '@/lib/labels'
+import { C } from '@/lib/theme'
 
 // Statuslabel + Farbe (Hintergrund, Text)
 const STATUS: Record<string, { label: string; bg: string; fg: string }> = {
@@ -63,7 +43,7 @@ function formatDate(iso: string | null) {
 function AuftraggeberKarte({ auftrag, anzahl }: { auftrag: AGAuftrag; anzahl: number }) {
   const status = STATUS[auftrag.status] ?? { label: auftrag.status, bg: '#ece8df', fg: '#6b6b60' }
   const frist = formatDate(auftrag.angebotsfrist)
-  const meta = [auftrag.gewerk ? GEWERK_LABELS[auftrag.gewerk] ?? auftrag.gewerk : null, auftrag.ausfuehrungsort_ort]
+  const meta = [auftrag.gewerk ? gewerkLabel(auftrag.gewerk) : null, auftrag.ausfuehrungsort_ort]
     .filter(Boolean)
     .join(' · ')
 

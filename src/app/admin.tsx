@@ -13,30 +13,9 @@ import {
   View,
 } from 'react-native'
 import { supabase } from '@/lib/supabase'
-
-const C = {
-  bg: '#f5f0e8',
-  primary: '#3a5a3e',
-  accent: '#c87941',
-  text: '#1a1a18',
-  muted: '#6b6b60',
-  border: '#ddd8cc',
-  card: '#ffffff',
-  ok: '#e8f0e9',
-}
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://www.vergabo.de'
-
-const GEWERK_LABELS: Record<string, string> = {
-  malerarbeiten: 'Malerarbeiten',
-  sanitaer: 'Sanitär',
-  elektro: 'Elektro',
-  schreiner: 'Schreiner',
-  dachdecker: 'Dachdecker',
-  garten: 'Garten',
-  reinigung: 'Reinigung',
-  sonstiges: 'Sonstiges',
-}
+import { API_URL } from '@/lib/config'
+import { GEWERK_LABELS } from '@/lib/labels'
+import { C } from '@/lib/theme'
 
 type AdminAnbieter = {
   id: string

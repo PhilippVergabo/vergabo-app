@@ -1,14 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { budgetRange } from '@/lib/budgetRange'
-
-const C = {
-  primary: '#3a5a3e',
-  accent: '#c87941',
-  text: '#1a1a18',
-  muted: '#6b6b60',
-  border: '#ddd8cc',
-  card: '#ffffff',
-}
+import { fmtPreis } from '@/lib/bewerbung'
+import { gewerkLabel } from '@/lib/labels'
+import { C } from '@/lib/theme'
 
 export type AuftragItem = {
   id: string
@@ -43,10 +37,6 @@ function formatBudget(max: number | null) {
   return budgetRange(max)
 }
 
-function formatPreis(n: number) {
-  return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' EUR'
-}
-
 export function AuftragKarte({ auftrag, beworben, angebotPreis, onPress }: Props) {
   const budget = formatBudget(auftrag.budget_max)
   const frist = formatDate(auftrag.frist)
@@ -68,7 +58,7 @@ export function AuftragKarte({ auftrag, beworben, angebotPreis, onPress }: Props
         )}
       </View>
 
-      {auftrag.gewerk ? <Text style={styles.gewerk}>{auftrag.gewerk}</Text> : null}
+      {auftrag.gewerk ? <Text style={styles.gewerk}>{gewerkLabel(auftrag.gewerk)}</Text> : null}
 
       <View style={styles.meta}>
         {ort ? <Text style={styles.metaText}>{'\u{1F4CD}'} {ort}</Text> : null}
@@ -76,7 +66,7 @@ export function AuftragKarte({ auftrag, beworben, angebotPreis, onPress }: Props
         {budget ? <Text style={styles.metaText}>{'\u{1F4B6}'} {budget}</Text> : null}
         {beworben && angebotPreis != null ? (
           <Text style={styles.metaOffer}>
-            {'\u{270D}\u{FE0F}'} Mein Angebot: {formatPreis(angebotPreis)} netto
+            {'\u{270D}\u{FE0F}'} Mein Angebot: {fmtPreis(angebotPreis)} € netto
           </Text>
         ) : null}
       </View>

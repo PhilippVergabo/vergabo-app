@@ -25,20 +25,8 @@ import {
   type LvPreis,
   type Position,
 } from '@/lib/bewerbung'
-
-const C = {
-  bg: '#f5f0e8',
-  primary: '#3a5a3e',
-  accent: '#c87941',
-  text: '#1a1a18',
-  muted: '#6b6b60',
-  border: '#ddd8cc',
-  card: '#ffffff',
-  ok: '#e8f0e9',
-  warn: '#fdf3ea',
-}
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://www.vergabo.de'
+import { API_URL } from '@/lib/config'
+import { C } from '@/lib/theme'
 
 type PickedFile = { uri: string; name: string; size: number; mimeType?: string }
 

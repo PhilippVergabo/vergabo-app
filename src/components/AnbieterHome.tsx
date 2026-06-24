@@ -15,32 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { AuftragKarte, type AuftragItem } from '@/components/AuftragKarte'
 import { addPushTapListener, registriereFuerPush } from '@/lib/push'
-
-const C = {
-  bg: '#f5f0e8',
-  primary: '#3a5a3e',
-  accent: '#c87941',
-  text: '#1a1a18',
-  muted: '#6b6b60',
-  border: '#ddd8cc',
-  card: '#ffffff',
-}
-
-const GEWERK_LABELS: Record<string, string> = {
-  malerarbeiten: 'Malerarbeiten',
-  sanitaer: 'Sanitär',
-  elektro: 'Elektro',
-  schreiner: 'Schreiner',
-  dachdecker: 'Dachdecker',
-  garten: 'Garten',
-  reinigung: 'Reinigung',
-  sonstiges: 'Sonstiges',
-}
-
-function gewerkLabel(g: string | null): string {
-  if (!g) return ''
-  return GEWERK_LABELS[g] ?? g
-}
+import { gewerkLabel } from '@/lib/labels'
+import { C } from '@/lib/theme'
 
 function Chip({ label, aktiv, onPress }: { label: string; aktiv: boolean; onPress: () => void }) {
   return (

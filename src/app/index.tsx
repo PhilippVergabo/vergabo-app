@@ -3,8 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { supabase } from '@/lib/supabase'
 import { AnbieterHome } from '@/components/AnbieterHome'
 import { AuftraggeberHome } from '@/components/AuftraggeberHome'
-
-const C = { bg: '#f5f0e8', primary: '#3a5a3e', text: '#1a1a18', muted: '#6b6b60' }
+import { C } from '@/lib/theme'
 
 // Rollen-Weiche: nach dem Login entscheidet profiles.rolle, welcher Home-Screen erscheint.
 export default function HomeScreen() {
