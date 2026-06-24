@@ -8,10 +8,11 @@ import {
   Text,
   View,
 } from 'react-native'
-import { useRouter, useFocusEffect } from 'expo-router'
+import { useRouter, useFocusEffect, type Href } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { abmeldenMitBestaetigung } from '@/lib/auth'
+import { addPushTapListener, registriereFuerPush } from '@/lib/push'
 import { API_URL } from '@/lib/config'
 import { gewerkLabel } from '@/lib/labels'
 import { C } from '@/lib/theme'
@@ -167,6 +168,14 @@ export function AuftraggeberHome() {
     await loadData()
     setRefreshing(false)
   }, [loadData])
+
+  // Push-Registrierung (Token im AG-Profil speichern) + Tap-Navigation zur
+  // jeweiligen Ausschreibung. No-op in Expo Go / ohne Berechtigung; die
+  // tatsächliche Zustellung übernimmt die Web-Plattform serverseitig.
+  useEffect(() => {
+    registriereFuerPush('auftraggeber_profile')
+    return addPushTapListener((link) => router.push(link as Href))
+  }, [router])
 
   const gesamtBewerbungen = auftraege.reduce((s, a) => s + (counts.get(a.id) ?? 0), 0)
 

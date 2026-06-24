@@ -16,10 +16,14 @@ Notifications.setNotificationHandler({
 
 /**
  * Fragt die Push-Berechtigung an, holt den Expo-Push-Token und speichert ihn im
- * eigenen anbieter_profile (RLS: Own-Row-Update erlaubt). No-op in Expo Go bzw.
- * ohne EAS-Projekt-ID oder ohne erteilte Berechtigung — bricht nie hart ab.
+ * eigenen Profil (RLS: Own-Row-Update erlaubt). No-op in Expo Go bzw. ohne
+ * EAS-Projekt-ID oder ohne erteilte Berechtigung — bricht nie hart ab.
+ *
+ * @param profilTabelle Zieltabelle für den Token (Anbieter oder Auftraggeber).
  */
-export async function registriereFuerPush(): Promise<void> {
+export async function registriereFuerPush(
+  profilTabelle: 'anbieter_profile' | 'auftraggeber_profile' = 'anbieter_profile',
+): Promise<void> {
   try {
     if (!Device.isDevice) return // Push nur auf echten Geräten, nicht im Simulator
 
@@ -48,7 +52,7 @@ export async function registriereFuerPush(): Promise<void> {
     const userId = sess.session?.user.id
     if (!userId) return
 
-    await supabase.from('anbieter_profile').update({ expo_push_token: token }).eq('user_id', userId)
+    await supabase.from(profilTabelle).update({ expo_push_token: token }).eq('user_id', userId)
   } catch {
     // non-fatal — Push ist optional
   }
