@@ -11,6 +11,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { supabase } from '@/lib/supabase'
+import { uebersetzeAuthFehler } from '@/lib/authFehler'
 import { VergaboLogo } from '@/components/VergaboLogo'
 import { C } from '@/lib/theme'
 
@@ -28,7 +29,7 @@ export default function LoginScreen() {
 
     if (error) {
       setLoading(false)
-      Alert.alert('Anmeldung fehlgeschlagen', error.message)
+      Alert.alert('Anmeldung fehlgeschlagen', uebersetzeAuthFehler(error))
       return
     }
 
