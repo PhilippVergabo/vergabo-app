@@ -8,32 +8,14 @@ import {
   Text,
   View,
 } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useRouter, useFocusEffect, type Href } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://www.vergabo.de'
-
-const C = {
-  bg: '#f5f0e8',
-  primary: '#3a5a3e',
-  accent: '#c87941',
-  text: '#1a1a18',
-  muted: '#6b6b60',
-  border: '#ddd8cc',
-  card: '#ffffff',
-}
-
-const GEWERK_LABELS: Record<string, string> = {
-  malerarbeiten: 'Malerarbeiten',
-  sanitaer: 'Sanitär',
-  elektro: 'Elektro',
-  schreiner: 'Schreiner',
-  dachdecker: 'Dachdecker',
-  garten: 'Garten',
-  reinigung: 'Reinigung',
-  sonstiges: 'Sonstiges',
-}
+import { abmeldenMitBestaetigung } from '@/lib/auth'
+import { addPushTapListener, registriereFuerPush } from '@/lib/push'
+import { API_URL } from '@/lib/config'
+import { gewerkLabel } from '@/lib/labels'
+import { C } from '@/lib/theme'
 
 // Statuslabel + Farbe (Hintergrund, Text)
 const STATUS: Record<string, { label: string; bg: string; fg: string }> = {
@@ -63,7 +45,7 @@ function formatDate(iso: string | null) {
 function AuftraggeberKarte({ auftrag, anzahl }: { auftrag: AGAuftrag; anzahl: number }) {
   const status = STATUS[auftrag.status] ?? { label: auftrag.status, bg: '#ece8df', fg: '#6b6b60' }
   const frist = formatDate(auftrag.angebotsfrist)
-  const meta = [auftrag.gewerk ? GEWERK_LABELS[auftrag.gewerk] ?? auftrag.gewerk : null, auftrag.ausfuehrungsort_ort]
+  const meta = [auftrag.gewerk ? gewerkLabel(auftrag.gewerk) : null, auftrag.ausfuehrungsort_ort]
     .filter(Boolean)
     .join(' · ')
 
@@ -168,9 +150,18 @@ export function AuftraggeberHome() {
     setCounts(next)
   }, [])
 
-  useEffect(() => {
-    loadData().finally(() => setLoading(false))
-  }, [loadData])
+  // Bei jedem Fokus neu laden, damit Status und Bewerbungszahlen aktuell sind.
+  useFocusEffect(
+    useCallback(() => {
+      let aktiv = true
+      loadData().finally(() => {
+        if (aktiv) setLoading(false)
+      })
+      return () => {
+        aktiv = false
+      }
+    }, [loadData]),
+  )
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -178,9 +169,13 @@ export function AuftraggeberHome() {
     setRefreshing(false)
   }, [loadData])
 
-  async function handleLogout() {
-    await supabase.auth.signOut()
-  }
+  // Push-Registrierung (Token im AG-Profil speichern) + Tap-Navigation zur
+  // jeweiligen Ausschreibung. No-op in Expo Go / ohne Berechtigung; die
+  // tatsächliche Zustellung übernimmt die Web-Plattform serverseitig.
+  useEffect(() => {
+    registriereFuerPush('auftraggeber_profile')
+    return addPushTapListener((link) => router.push(link as Href))
+  }, [router])
 
   const gesamtBewerbungen = auftraege.reduce((s, a) => s + (counts.get(a.id) ?? 0), 0)
 
@@ -196,12 +191,17 @@ export function AuftraggeberHome() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Meine Ausschreibungen</Text>
-        <Pressable onPress={handleLogout} hitSlop={8}>
+        <Pressable onPress={abmeldenMitBestaetigung} hitSlop={8} accessibilityRole="button">
           <Text style={styles.logout}>Abmelden</Text>
         </Pressable>
       </View>
       {istAdmin ? (
-        <Pressable style={styles.adminRow} onPress={() => router.push('/admin')}>
+        <Pressable
+          style={styles.adminRow}
+          onPress={() => router.push('/admin')}
+          accessibilityRole="button"
+          accessibilityLabel="Admin – Anbieter verifizieren"
+        >
           <Text style={styles.adminRowText}>🛡️ Admin – Anbieter verifizieren</Text>
         </Pressable>
       ) : null}

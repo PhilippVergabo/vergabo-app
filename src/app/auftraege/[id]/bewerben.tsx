@@ -25,20 +25,8 @@ import {
   type LvPreis,
   type Position,
 } from '@/lib/bewerbung'
-
-const C = {
-  bg: '#f5f0e8',
-  primary: '#3a5a3e',
-  accent: '#c87941',
-  text: '#1a1a18',
-  muted: '#6b6b60',
-  border: '#ddd8cc',
-  card: '#ffffff',
-  ok: '#e8f0e9',
-  warn: '#fdf3ea',
-}
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://www.vergabo.de'
+import { API_URL } from '@/lib/config'
+import { C } from '@/lib/theme'
 
 type PickedFile = { uri: string; name: string; size: number; mimeType?: string }
 
@@ -51,6 +39,7 @@ export default function BewerbenScreen() {
   const router = useRouter()
 
   const [loading, setLoading] = useState(true)
+  const [nichtMoeglich, setNichtMoeglich] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
 
@@ -86,11 +75,22 @@ export default function BewerbenScreen() {
       const { data } = await supabase
         .from('auftraege')
         .select(
-          'eignungskriterien, verpflichtungserklaerungen, hat_leistungsverzeichnis, leistungsverzeichnis, kostenschaetzung, bindefrist',
+          'status, angebotsfrist, eignungskriterien, verpflichtungserklaerungen, hat_leistungsverzeichnis, leistungsverzeichnis, kostenschaetzung, bindefrist',
         )
         .eq('id', id)
         .single()
       if (!aktiv || !data) {
+        setLoading(false)
+        return
+      }
+
+      // Abgabe nur bei veröffentlichter Ausschreibung und vor Fristablauf —
+      // schützt auch beim direkten Aufruf (Deep-Link), nicht nur über den Button.
+      const fristAbgelaufen = data.angebotsfrist
+        ? new Date() >= new Date(data.angebotsfrist as string)
+        : false
+      if (data.status !== 'veroeffentlicht' || fristAbgelaufen) {
+        setNichtMoeglich(true)
         setLoading(false)
         return
       }
@@ -307,6 +307,22 @@ export default function BewerbenScreen() {
     )
   }
 
+  if (nichtMoeglich) {
+    return (
+      <View style={[styles.center, { padding: 24, gap: 16 }]}>
+        <Text style={{ fontSize: 40 }}>🔒</Text>
+        <Text style={styles.successTitle}>Abgabe nicht möglich</Text>
+        <Text style={styles.successText}>
+          Für diese Ausschreibung können keine Angebote (mehr) abgegeben werden – die Frist ist
+          abgelaufen oder sie ist nicht mehr veröffentlicht.
+        </Text>
+        <Pressable style={styles.submitBtn} onPress={() => router.replace(`/auftraege/${id}`)}>
+          <Text style={styles.submitText}>Zurück zur Ausschreibung</Text>
+        </Pressable>
+      </View>
+    )
+  }
+
   if (success) {
     return (
       <View style={[styles.center, { padding: 24, gap: 16 }]}>
@@ -444,6 +460,9 @@ export default function BewerbenScreen() {
                     onPress={() =>
                       setEignungsbestaetigung((prev) => ({ ...prev, [k.id]: !prev[k.id] }))
                     }
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked }}
+                    accessibilityLabel={k.text}
                   >
                     <Text style={checked ? styles.checkOk : styles.checkEmpty}>{checked ? '✓' : '○'}</Text>
                     <Text style={styles.kriteriumText}>
@@ -477,6 +496,9 @@ export default function BewerbenScreen() {
                           prev.map((b, j) => (j === i ? !b : b)),
                         )
                       }
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked }}
+                      accessibilityLabel={v.titel}
                     >
                       <Text style={checked ? styles.checkOk : styles.checkEmpty}>
                         {checked ? '✓' : '○'}
@@ -575,6 +597,8 @@ export default function BewerbenScreen() {
           style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
           onPress={handleSubmit}
           disabled={!canSubmit}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !canSubmit, busy: submitting }}
         >
           <Text style={styles.submitText}>{submitting ? 'Wird eingereicht …' : 'Angebot einreichen'}</Text>
         </Pressable>

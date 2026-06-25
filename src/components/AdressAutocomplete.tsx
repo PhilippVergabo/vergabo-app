@@ -1,15 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { adressSuche, type AdressVorschlag } from '@/lib/adressSuche'
-
-const C = {
-  bg: '#f5f0e8',
-  primary: '#3a5a3e',
-  text: '#1a1a18',
-  muted: '#6b6b60',
-  border: '#ddd8cc',
-  card: '#ffffff',
-}
+import { C } from '@/lib/theme'
 
 type Props = {
   value: string

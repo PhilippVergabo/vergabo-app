@@ -25,20 +25,8 @@ import {
   type LvPreis,
   type Position,
 } from '@/lib/bewerbung'
-
-const C = {
-  bg: '#f5f0e8',
-  primary: '#3a5a3e',
-  accent: '#c87941',
-  text: '#1a1a18',
-  muted: '#6b6b60',
-  border: '#ddd8cc',
-  card: '#ffffff',
-  ok: '#e8f0e9',
-  warn: '#fdf3ea',
-}
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://www.vergabo.de'
+import { API_URL } from '@/lib/config'
+import { C } from '@/lib/theme'
 
 type PickedFile = { uri: string; name: string; size: number; mimeType?: string }
 
@@ -544,6 +532,9 @@ export default function BewerbungBearbeitenScreen() {
                     onPress={() =>
                       setEignungsbestaetigung((prev) => ({ ...prev, [k.id]: !prev[k.id] }))
                     }
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked }}
+                    accessibilityLabel={k.text}
                   >
                     <Text style={checked ? styles.checkOk : styles.checkEmpty}>{checked ? '✓' : '○'}</Text>
                     <Text style={styles.kriteriumText}>
@@ -577,6 +568,9 @@ export default function BewerbungBearbeitenScreen() {
                           prev.map((b, j) => (j === i ? !b : b)),
                         )
                       }
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked }}
+                      accessibilityLabel={v.titel}
                     >
                       <Text style={checked ? styles.checkOk : styles.checkEmpty}>
                         {checked ? '✓' : '○'}
@@ -675,6 +669,8 @@ export default function BewerbungBearbeitenScreen() {
           style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
           onPress={handleSubmit}
           disabled={!canSubmit}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !canSubmit, busy: submitting }}
         >
           <Text style={styles.submitText}>{submitting ? 'Wird gespeichert …' : 'Änderungen speichern'}</Text>
         </Pressable>

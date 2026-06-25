@@ -1,14 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { budgetRange } from '@/lib/budgetRange'
-
-const C = {
-  primary: '#3a5a3e',
-  accent: '#c87941',
-  text: '#1a1a18',
-  muted: '#6b6b60',
-  border: '#ddd8cc',
-  card: '#ffffff',
-}
+import { fmtPreis } from '@/lib/bewerbung'
+import { gewerkLabel } from '@/lib/labels'
+import { C } from '@/lib/theme'
 
 export type AuftragItem = {
   id: string
@@ -43,19 +37,31 @@ function formatBudget(max: number | null) {
   return budgetRange(max)
 }
 
-function formatPreis(n: number) {
-  return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' EUR'
-}
-
 export function AuftragKarte({ auftrag, beworben, angebotPreis, onPress }: Props) {
   const budget = formatBudget(auftrag.budget_max)
   const frist = formatDate(auftrag.frist)
   const ort = [auftrag.ausfuehrungsort_plz, auftrag.ausfuehrungsort_ort].filter(Boolean).join(' ')
 
+  // Karteninhalt zu einer Vorlese-Beschriftung zusammenfassen (Screenreader liest
+  // die Karte als eine Einheit statt als lose Einzeltexte).
+  const a11yLabel = [
+    `Ausschreibung: ${auftrag.titel}`,
+    auftrag.gewerk ? gewerkLabel(auftrag.gewerk) : null,
+    ort ? `Ort ${ort}` : null,
+    frist ? `Frist ${frist}` : null,
+    budget ? `Budget ${budget}` : null,
+    beworben ? 'Bereits beworben' : null,
+  ]
+    .filter(Boolean)
+    .join(', ')
+
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={a11yLabel}
+      accessibilityHint="Öffnet die Details der Ausschreibung"
     >
       <View style={styles.titleRow}>
         <Text style={styles.titel} numberOfLines={2}>
@@ -68,7 +74,7 @@ export function AuftragKarte({ auftrag, beworben, angebotPreis, onPress }: Props
         )}
       </View>
 
-      {auftrag.gewerk ? <Text style={styles.gewerk}>{auftrag.gewerk}</Text> : null}
+      {auftrag.gewerk ? <Text style={styles.gewerk}>{gewerkLabel(auftrag.gewerk)}</Text> : null}
 
       <View style={styles.meta}>
         {ort ? <Text style={styles.metaText}>{'\u{1F4CD}'} {ort}</Text> : null}
@@ -76,7 +82,7 @@ export function AuftragKarte({ auftrag, beworben, angebotPreis, onPress }: Props
         {budget ? <Text style={styles.metaText}>{'\u{1F4B6}'} {budget}</Text> : null}
         {beworben && angebotPreis != null ? (
           <Text style={styles.metaOffer}>
-            {'\u{270D}\u{FE0F}'} Mein Angebot: {formatPreis(angebotPreis)} netto
+            {'\u{270D}\u{FE0F}'} Mein Angebot: {fmtPreis(angebotPreis)} € netto
           </Text>
         ) : null}
       </View>

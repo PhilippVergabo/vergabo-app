@@ -1,16 +1,7 @@
 import { useState } from 'react'
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { EINHEITEN, fmtPreis, type Position } from '@/lib/bewerbung'
-
-const C = {
-  primary: '#3a5a3e',
-  accent: '#c87941',
-  text: '#1a1a18',
-  muted: '#6b6b60',
-  border: '#ddd8cc',
-  field: '#f5f0e8',
-  card: '#ffffff',
-}
+import { C } from '@/lib/theme'
 
 const defaultPositionen: Position[] = [
   { id: '1', beschreibung: 'Arbeitszeit', menge: 1, einheit: 'Stunden', einzelpreis: 0, gesamt: 0 },
@@ -79,7 +70,13 @@ export function PositionenEditor({ initialPositionen, onChange }: Props) {
               placeholderTextColor={C.muted}
               onChangeText={(t) => updatePosition(p.id, 'beschreibung', t)}
             />
-            <Pressable onPress={() => loeschen(p.id)} hitSlop={8} style={styles.del}>
+            <Pressable
+              onPress={() => loeschen(p.id)}
+              hitSlop={8}
+              style={styles.del}
+              accessibilityRole="button"
+              accessibilityLabel="Position löschen"
+            >
               <Text style={styles.delText}>✕</Text>
             </Pressable>
           </View>
@@ -120,7 +117,7 @@ export function PositionenEditor({ initialPositionen, onChange }: Props) {
         </View>
       ))}
 
-      <Pressable onPress={hinzufuegen} hitSlop={6}>
+      <Pressable onPress={hinzufuegen} hitSlop={6} accessibilityRole="button">
         <Text style={styles.add}>+ Weitere Position hinzufügen</Text>
       </Pressable>
 

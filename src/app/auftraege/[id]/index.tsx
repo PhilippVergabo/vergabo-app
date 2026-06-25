@@ -3,16 +3,8 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { budgetRange } from '@/lib/budgetRange'
-
-const C = {
-  bg: '#f5f0e8',
-  primary: '#3a5a3e',
-  accent: '#c87941',
-  text: '#1a1a18',
-  muted: '#6b6b60',
-  border: '#ddd8cc',
-  card: '#ffffff',
-}
+import { gewerkLabel } from '@/lib/labels'
+import { C } from '@/lib/theme'
 
 type AuftragDetail = {
   id: string
@@ -99,11 +91,14 @@ export default function AuftragDetailScreen() {
   const ort = [auftrag.ausfuehrungsort_plz, auftrag.ausfuehrungsort_ort].filter(Boolean).join(' ')
   // Anbieter sehen nur die grobe Budget-Klasse (Basis budget_bis), nie exakte Werte.
   const budgetText = auftrag.budget_max != null ? budgetRange(auftrag.budget_max) : null
-  const aktiv = auftrag.status === 'veroeffentlicht'
+  // Angebote nur möglich, solange veröffentlicht UND die Angebotsfrist nicht
+  // abgelaufen ist (konsistent zum Bearbeiten-Flow).
+  const fristAbgelaufen = auftrag.frist ? new Date() >= new Date(auftrag.frist) : false
+  const aktiv = auftrag.status === 'veroeffentlicht' && !fristAbgelaufen
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {auftrag.gewerk ? <Text style={styles.gewerk}>{auftrag.gewerk}</Text> : null}
+      {auftrag.gewerk ? <Text style={styles.gewerk}>{gewerkLabel(auftrag.gewerk)}</Text> : null}
       <Text style={styles.titel}>{auftrag.titel}</Text>
 
       <View style={styles.metaBlock}>
@@ -129,6 +124,7 @@ export default function AuftragDetailScreen() {
               <Pressable
                 style={styles.ctaButton}
                 onPress={() => router.push(`/auftraege/${auftrag.id}/bearbeiten`)}
+                accessibilityRole="button"
               >
                 <Text style={styles.ctaButtonText}>Angebot bearbeiten</Text>
               </Pressable>
@@ -138,6 +134,7 @@ export default function AuftragDetailScreen() {
           <Pressable
             style={styles.ctaButton}
             onPress={() => router.push(`/auftraege/${auftrag.id}/bewerben`)}
+            accessibilityRole="button"
           >
             <Text style={styles.ctaButtonText}>Angebot abgeben</Text>
           </Pressable>

@@ -10,43 +10,23 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import { useRouter, type Href } from 'expo-router'
+import { useRouter, useFocusEffect, type Href } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
+import { abmeldenMitBestaetigung } from '@/lib/auth'
 import { AuftragKarte, type AuftragItem } from '@/components/AuftragKarte'
 import { addPushTapListener, registriereFuerPush } from '@/lib/push'
-
-const C = {
-  bg: '#f5f0e8',
-  primary: '#3a5a3e',
-  accent: '#c87941',
-  text: '#1a1a18',
-  muted: '#6b6b60',
-  border: '#ddd8cc',
-  card: '#ffffff',
-}
-
-const GEWERK_LABELS: Record<string, string> = {
-  malerarbeiten: 'Malerarbeiten',
-  sanitaer: 'Sanitär',
-  elektro: 'Elektro',
-  schreiner: 'Schreiner',
-  dachdecker: 'Dachdecker',
-  garten: 'Garten',
-  reinigung: 'Reinigung',
-  sonstiges: 'Sonstiges',
-}
-
-function gewerkLabel(g: string | null): string {
-  if (!g) return ''
-  return GEWERK_LABELS[g] ?? g
-}
+import { gewerkLabel } from '@/lib/labels'
+import { C } from '@/lib/theme'
 
 function Chip({ label, aktiv, onPress }: { label: string; aktiv: boolean; onPress: () => void }) {
   return (
     <Pressable
       style={[styles.chip, aktiv ? styles.chipAktiv : styles.chipInaktiv]}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: aktiv }}
+      accessibilityLabel={`Filter ${label}`}
     >
       <Text style={[styles.chipText, aktiv ? styles.chipTextAktiv : styles.chipTextInaktiv]}>
         {label}
@@ -114,9 +94,19 @@ export function AnbieterHome() {
     setMeineAngebote(angebote)
   }, [])
 
-  useEffect(() => {
-    loadData().finally(() => setLoading(false))
-  }, [loadData])
+  // Bei jedem Fokus neu laden, damit der "Beworben"-Status nach dem Einreichen
+  // sofort erscheint (nicht erst nach manuellem Pull-to-Refresh).
+  useFocusEffect(
+    useCallback(() => {
+      let aktiv = true
+      loadData().finally(() => {
+        if (aktiv) setLoading(false)
+      })
+      return () => {
+        aktiv = false
+      }
+    }, [loadData]),
+  )
 
   // Push-Registrierung (Token speichern) + Tap-Navigation zur Ausschreibung.
   // No-op in Expo Go / ohne Berechtigung — greift erst im Dev-/EAS-Build.
@@ -131,12 +121,7 @@ export function AnbieterHome() {
     setRefreshing(false)
   }, [loadData])
 
-  async function handleLogout() {
-    await supabase.auth.signOut()
-  }
-
-  if (loading) {
-    return (
+  if (loading) {    return (
       <View style={styles.center}>
         <ActivityIndicator color={C.primary} size="large" />
       </View>
@@ -147,14 +132,16 @@ export function AnbieterHome() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Ausschreibungen</Text>
-        <Pressable onPress={handleLogout} hitSlop={8}>
+        <Pressable onPress={abmeldenMitBestaetigung} hitSlop={8} accessibilityRole="button">
           <Text style={styles.logout}>Abmelden</Text>
         </Pressable>
       </View>
 
       <View style={styles.filterBar}>
         <View style={styles.searchRow}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Text style={styles.searchIcon} importantForAccessibility="no" accessibilityElementsHidden>
+            🔍
+          </Text>
           <TextInput
             style={styles.searchInput}
             value={suche}
@@ -166,7 +153,12 @@ export function AnbieterHome() {
             returnKeyType="search"
           />
           {suche.length > 0 ? (
-            <Pressable onPress={() => setSuche('')} hitSlop={8}>
+            <Pressable
+              onPress={() => setSuche('')}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Suche löschen"
+            >
               <Text style={styles.clearText}>✕</Text>
             </Pressable>
           ) : null}

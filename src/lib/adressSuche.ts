@@ -6,7 +6,9 @@ const PHOTON_URL = 'https://photon.komoot.io/api/'
 // Grobe Bounding-Box Deutschland (minLon, minLat, maxLon, maxLat).
 const DE_BBOX = '5.87,47.27,15.04,55.06'
 
-const BUNDESLAND_KUERZEL: Record<string, string> = {
+// Bundesland-Name (z. B. aus openPLZ/Photon) → amtliches Kürzel. Auch von den
+// Registrierungs-Screens genutzt (PLZ-Lookup), daher exportiert.
+export const BUNDESLAND_KUERZEL: Record<string, string> = {
   'Baden-Württemberg': 'bw',
   Bayern: 'by',
   Berlin: 'be',
@@ -25,7 +27,7 @@ const BUNDESLAND_KUERZEL: Record<string, string> = {
   Thüringen: 'th',
 }
 
-function bundeslandKuerzel(name?: string | null): string {
+export function bundeslandKuerzel(name?: string | null): string {
   return (name && BUNDESLAND_KUERZEL[name]) || ''
 }
 

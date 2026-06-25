@@ -1,16 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { VergaboLogo } from '@/components/VergaboLogo'
-
-const C = {
-  bg: '#f5f0e8',
-  primary: '#3a5a3e',
-  accent: '#c87941',
-  text: '#1a1a18',
-  muted: '#6b6b60',
-  border: '#ddd8cc',
-  card: '#ffffff',
-}
+import { C } from '@/lib/theme'
 
 export default function RegistrierenAuswahl() {
   const router = useRouter()

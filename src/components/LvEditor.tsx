@@ -1,16 +1,7 @@
 import { useState } from 'react'
 import { StyleSheet, Text, TextInput, View } from 'react-native'
 import { fmtPreis, type LvPosition, type LvPreis } from '@/lib/bewerbung'
-
-const C = {
-  primary: '#3a5a3e',
-  accent: '#c87941',
-  text: '#1a1a18',
-  muted: '#6b6b60',
-  border: '#ddd8cc',
-  field: '#f5f0e8',
-  card: '#ffffff',
-}
+import { C } from '@/lib/theme'
 
 type Props = {
   positionen: LvPosition[]

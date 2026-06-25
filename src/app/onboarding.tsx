@@ -13,15 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useRouter } from 'expo-router'
 import { VergaboLogo } from '@/components/VergaboLogo'
-
-const C = {
-  bg: '#f5f0e8',
-  primary: '#3a5a3e',
-  accent: '#c87941',
-  text: '#1a1a18',
-  muted: '#6b6b60',
-  border: '#ddd8cc',
-}
+import { C } from '@/lib/theme'
 
 // Versionierter Schlüssel: hochzählen setzt das Onboarding für alle einmalig zurück.
 const ONBOARDING_FLAG = 'onboarding_gesehen_v2'

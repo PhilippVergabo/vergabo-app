@@ -15,17 +15,8 @@ import {
 import { useRouter } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { AdressAutocomplete } from '@/components/AdressAutocomplete'
-
-const C = {
-  bg: '#f5f0e8',
-  primary: '#3a5a3e',
-  accent: '#c87941',
-  text: '#1a1a18',
-  muted: '#6b6b60',
-  border: '#ddd8cc',
-  card: '#ffffff',
-  ok: '#e8f0e9',
-}
+import { bundeslandKuerzel } from '@/lib/adressSuche'
+import { C } from '@/lib/theme'
 
 const RECHTSFORMEN = [
   { value: 'einzelunternehmen', label: 'Einzelunternehmen' },
@@ -59,25 +50,6 @@ function passwordValid(p: string) {
   return PW_REGELN.every((r) => r.test(p))
 }
 
-const BUNDESLAND_MAP: Record<string, string> = {
-  'Baden-Württemberg': 'bw',
-  Bayern: 'by',
-  Berlin: 'be',
-  Brandenburg: 'bb',
-  Bremen: 'hb',
-  Hamburg: 'hh',
-  Hessen: 'he',
-  'Mecklenburg-Vorpommern': 'mv',
-  Niedersachsen: 'ni',
-  'Nordrhein-Westfalen': 'nw',
-  'Rheinland-Pfalz': 'rp',
-  Saarland: 'sl',
-  Sachsen: 'sn',
-  'Sachsen-Anhalt': 'st',
-  'Schleswig-Holstein': 'sh',
-  Thüringen: 'th',
-}
-
 async function plzLookup(plz: string): Promise<{ ort: string; bundesland: string } | null> {
   if (plz.length !== 5) return null
   try {
@@ -86,7 +58,7 @@ async function plzLookup(plz: string): Promise<{ ort: string; bundesland: string
     if (Array.isArray(data) && data.length > 0) {
       return {
         ort: data[0].name,
-        bundesland: BUNDESLAND_MAP[data[0].federalState?.name] ?? '',
+        bundesland: bundeslandKuerzel(data[0].federalState?.name),
       }
     }
   } catch {
