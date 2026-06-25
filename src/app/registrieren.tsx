@@ -14,6 +14,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { supabase } from '@/lib/supabase'
+import { uebersetzeAuthFehler } from '@/lib/authFehler'
 import { AdressAutocomplete } from '@/components/AdressAutocomplete'
 import { bundeslandKuerzel } from '@/lib/adressSuche'
 import { C } from '@/lib/theme'
@@ -150,7 +151,7 @@ export default function RegistrierenScreen() {
     })
     setLoading(false)
     if (error) {
-      Alert.alert('Registrierung fehlgeschlagen', error.message)
+      Alert.alert('Registrierung fehlgeschlagen', uebersetzeAuthFehler(error))
       return
     }
     // Anti-Enumeration: existiert die E-Mail bereits, gibt Supabase einen User
