@@ -29,10 +29,15 @@ export function PositionenEditor({ initialPositionen, onChange }: Props) {
   }
 
   function updatePosition(id: string, field: keyof Position, value: string | number) {
+    // Menge und Einzelpreis dürfen nicht negativ werden – sonst ließe sich die
+    // Gesamtsumme künstlich (z. B. mit zwei negativen Positionen) verfälschen.
+    // (Spiegel der Web-Klemmung in AngebotPositionen; Minus kommt mobil v. a. per Einfügen rein.)
+    const sicher =
+      field === 'menge' || field === 'einzelpreis' ? Math.max(0, Number(value) || 0) : value
     emit(
       positionen.map((p) => {
         if (p.id !== id) return p
-        const neu = { ...p, [field]: value }
+        const neu = { ...p, [field]: sicher }
         if (field === 'menge' || field === 'einzelpreis') {
           neu.gesamt = Number(neu.menge) * Number(neu.einzelpreis)
         }

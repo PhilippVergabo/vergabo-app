@@ -33,7 +33,9 @@ export function LvEditor({ positionen, initialPreise, onChange }: Props) {
   }
 
   function setEp(id: string, value: number) {
-    const next = { ...preise, [id]: value }
+    // Einheitspreise nicht negativ – Spiegel der Web-Klemmung (LvBewerbungsTabelle),
+    // damit sich die LV-Summe nicht mit Negativposten verfälschen lässt.
+    const next = { ...preise, [id]: Math.max(0, Number(value) || 0) }
     setPreise(next)
     emit(next)
   }
