@@ -50,7 +50,7 @@ export function AuftragKarte({ auftrag, beworben, angebotPreis, onPress }: Props
     ort ? `Ort ${ort}` : null,
     frist ? `Frist ${frist}` : null,
     budget ? `Budget ${budget}` : null,
-    beworben ? 'Bereits beworben' : null,
+    beworben ? 'Angebot abgegeben' : null,
   ]
     .filter(Boolean)
     .join(', ')
@@ -69,7 +69,7 @@ export function AuftragKarte({ auftrag, beworben, angebotPreis, onPress }: Props
         </Text>
         {beworben && (
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>Beworben</Text>
+            <Text style={styles.badgeText}>Angebot abgegeben</Text>
           </View>
         )}
       </View>

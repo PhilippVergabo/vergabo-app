@@ -119,7 +119,7 @@ export default function AuftragDetailScreen() {
         {meineBewerbung ? (
           <View style={{ gap: 12 }}>
             <View style={styles.beworbenBanner}>
-              <Text style={styles.beworbenText}>Sie haben sich bereits beworben.</Text>
+              <Text style={styles.beworbenText}>Sie haben bereits ein Angebot abgegeben.</Text>
             </View>
             {aktiv && ['eingereicht', 'in_pruefung'].includes(meineBewerbung.status) ? (
               <Pressable

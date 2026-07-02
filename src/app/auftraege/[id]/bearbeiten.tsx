@@ -288,7 +288,7 @@ export default function BewerbungBearbeitenScreen() {
       const { data: sess } = await supabase.auth.getSession()
       const token = sess.session?.access_token
       if (!token) {
-        Alert.alert('Nicht angemeldet', 'Bitte melde dich erneut an.')
+        Alert.alert('Nicht angemeldet', 'Bitte melden Sie sich erneut an.')
         setSubmitting(false)
         return
       }
@@ -355,7 +355,7 @@ export default function BewerbungBearbeitenScreen() {
       setSuccess(true)
       setSubmitting(false)
     } catch {
-      Alert.alert('Netzwerkfehler', 'Die Änderungen konnten nicht gesendet werden. Prüfe deine Verbindung.')
+      Alert.alert('Netzwerkfehler', 'Die Änderungen konnten nicht gesendet werden. Prüfen Sie Ihre Verbindung.')
       setSubmitting(false)
     }
   }
@@ -389,7 +389,7 @@ export default function BewerbungBearbeitenScreen() {
       <View style={[styles.center, { padding: 24, gap: 16 }]}>
         <Text style={{ fontSize: 48 }}>✅</Text>
         <Text style={styles.successTitle}>Angebot aktualisiert!</Text>
-        <Text style={styles.successText}>Deine Änderungen wurden gespeichert.</Text>
+        <Text style={styles.successText}>Ihre Änderungen wurden gespeichert.</Text>
         <Pressable style={styles.submitBtn} onPress={() => router.replace(`/auftraege/${id}`)}>
           <Text style={styles.submitText}>Zurück zur Ausschreibung</Text>
         </Pressable>
@@ -612,12 +612,12 @@ export default function BewerbungBearbeitenScreen() {
 
         {/* Beschreibung */}
         <View style={styles.field}>
-          <Text style={styles.label}>Kurzbeschreibung deines Angebots</Text>
+          <Text style={styles.label}>Kurzbeschreibung Ihres Angebots</Text>
           <TextInput
             style={[styles.input, styles.textarea]}
             value={beschreibung}
             onChangeText={setBeschreibung}
-            placeholder="Wie gehst du die Aufgabe an?"
+            placeholder="Wie gehen Sie die Aufgabe an?"
             placeholderTextColor={C.muted}
             multiline
             numberOfLines={4}

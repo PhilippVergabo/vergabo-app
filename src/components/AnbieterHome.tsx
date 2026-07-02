@@ -209,7 +209,7 @@ export function AnbieterHome() {
           accessibilityLabel="Konto noch nicht verifiziert – Nachweise hochladen"
         >
           <Text style={styles.verifBannerText}>
-            ⏳ Dein Konto ist noch nicht verifiziert – Zuschläge sind erst nach der Verifizierung
+            ⏳ Ihr Konto ist noch nicht verifiziert – Zuschläge sind erst nach der Verifizierung
             möglich. <Text style={styles.verifBannerLink}>Nachweise hochladen →</Text>
           </Text>
         </Pressable>
@@ -246,7 +246,7 @@ export function AnbieterHome() {
               {error
                 ? `Fehler beim Laden: ${error}`
                 : auftraege.length > 0
-                  ? 'Keine Treffer für deine Suche'
+                  ? 'Keine Treffer für Ihre Suche'
                   : 'Keine offenen Ausschreibungen'}
             </Text>
           </View>

@@ -116,7 +116,7 @@ export default function AdminScreen() {
         code,
       })
       if (vErr) {
-        Alert.alert('Code ungültig', 'Bitte prüfe den 6-stelligen Code in deiner Authenticator-App.')
+        Alert.alert('Code ungültig', 'Bitte prüfen Sie den 6-stelligen Code in Ihrer Authenticator-App.')
         setCode('')
         return
       }
@@ -182,7 +182,7 @@ export default function AdminScreen() {
           <Text style={{ fontSize: 40 }}>🛡️</Text>
           <Text style={styles.mfaTitel}>Zwei-Faktor-Bestätigung</Text>
           <Text style={styles.mfaHint}>
-            Admin-Aktionen erfordern 2FA. Gib den 6-stelligen Code aus deiner Authenticator-App ein.
+            Admin-Aktionen erfordern 2FA. Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein.
           </Text>
           <TextInput
             style={styles.codeInput}

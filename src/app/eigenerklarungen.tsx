@@ -187,8 +187,8 @@ export default function EigenerklarungenScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.intro}>
-        Hinterlege deine Nachweise einmalig im Konto – sie werden von Vergabo geprüft und bei
-        Bewerbungen automatisch berücksichtigt. Erlaubt: {EIGENERKLARUNG_UPLOAD.label}, max.{' '}
+        Hinterlegen Sie Ihre Nachweise einmalig im Konto – sie werden von Vergabo geprüft und bei
+        Angeboten automatisch berücksichtigt. Erlaubt: {EIGENERKLARUNG_UPLOAD.label}, max.{' '}
         {Math.round(EIGENERKLARUNG_UPLOAD.maxBytes / (1024 * 1024))} MB pro Datei.
       </Text>
 

@@ -121,7 +121,7 @@ export default function RegistrierenAuftraggeber() {
     if (data.user && (data.user.identities?.length ?? 0) === 0) {
       Alert.alert(
         'E-Mail bereits registriert',
-        'Für diese E-Mail-Adresse besteht schon ein Konto. Bitte melde dich an oder nutze auf vergabo.de „Passwort vergessen".',
+        'Für diese E-Mail-Adresse besteht schon ein Konto. Bitte melden Sie sich an oder nutzen Sie auf vergabo.de „Passwort vergessen".',
       )
       return
     }
@@ -135,7 +135,7 @@ export default function RegistrierenAuftraggeber() {
         <Text style={styles.erfolgTitel}>Fast geschafft!</Text>
         <Text style={styles.erfolgText}>
           Wir haben einen Bestätigungslink an <Text style={{ fontWeight: '700' }}>{email}</Text>{' '}
-          gesendet. Bitte bestätige deine E-Mail-Adresse und melde dich danach hier an.
+          gesendet. Bitte bestätigen Sie Ihre E-Mail-Adresse und melden Sie sich danach hier an.
         </Text>
         <Pressable style={[styles.primaryBtn, styles.erfolgBtn]} onPress={() => router.replace('/login')}>
           <Text style={[styles.primaryBtnText, { fontSize: 16 }]}>Zur Anmeldung</Text>

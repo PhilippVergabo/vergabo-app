@@ -30,12 +30,12 @@ const SLIDES: Slide[] = [
   {
     icon: '🔍',
     titel: 'Passende Aufträge finden',
-    text: 'Sieh offene Ausschreibungen in deinem Gewerk und deiner Region — gefiltert, übersichtlich und auf einen Blick.',
+    text: 'Sehen Sie offene Ausschreibungen in Ihrem Gewerk und Ihrer Region — gefiltert, übersichtlich und auf einen Blick.',
   },
   {
     icon: '📨',
     titel: 'Mit wenigen Klicks bieten',
-    text: 'Reiche dein Angebot direkt in der App ein: Kalkulation, Eignungsnachweise und Anhänge — fertig.',
+    text: 'Reichen Sie Ihr Angebot direkt in der App ein: Kalkulation, Eignungsnachweise und Anhänge — fertig.',
   },
 ]
 

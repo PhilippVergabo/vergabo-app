@@ -159,7 +159,7 @@ export default function RegistrierenScreen() {
     if (data.user && (data.user.identities?.length ?? 0) === 0) {
       Alert.alert(
         'E-Mail bereits registriert',
-        'Für diese E-Mail-Adresse besteht schon ein Konto. Bitte melde dich an oder nutze auf vergabo.de „Passwort vergessen".',
+        'Für diese E-Mail-Adresse besteht schon ein Konto. Bitte melden Sie sich an oder nutzen Sie auf vergabo.de „Passwort vergessen".',
       )
       return
     }
@@ -173,7 +173,7 @@ export default function RegistrierenScreen() {
         <Text style={styles.erfolgTitel}>Fast geschafft!</Text>
         <Text style={styles.erfolgText}>
           Wir haben einen Bestätigungslink an <Text style={{ fontWeight: '700' }}>{email}</Text>{' '}
-          gesendet. Bitte bestätige deine E-Mail-Adresse und melde dich danach hier an.
+          gesendet. Bitte bestätigen Sie Ihre E-Mail-Adresse und melden Sie sich danach hier an.
         </Text>
         <Pressable style={[styles.primaryBtn, styles.erfolgBtn]} onPress={() => router.replace('/login')}>
           <Text style={[styles.primaryBtnText, styles.erfolgBtnText]}>Zur Anmeldung</Text>
@@ -303,7 +303,7 @@ export default function RegistrierenScreen() {
             <Text style={styles.stepTitel}>Gewerke & Standort</Text>
             <Text style={styles.stepHint}>Schritt 3 von 3</Text>
 
-            <Text style={styles.feldLabel}>Welche Gewerke bietest du an?</Text>
+            <Text style={styles.feldLabel}>Welche Gewerke bieten Sie an?</Text>
             <View style={styles.optionWrap}>
               {GEWERKE.map((g) => (
                 <Auswahl key={g.value} label={g.label} aktiv={gewerke.includes(g.value)} onPress={() => toggleGewerk(g.value)} />

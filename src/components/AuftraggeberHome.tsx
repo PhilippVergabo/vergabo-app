@@ -66,10 +66,10 @@ function AuftraggeberKarte({ auftrag, anzahl }: { auftrag: AGAuftrag; anzahl: nu
       <View style={styles.bewerbungenRow}>
         {anzahl > 0 ? (
           <Text style={styles.bewerbungenAktiv}>
-            {'\u{1F4E5}'} {anzahl} {anzahl === 1 ? 'Bewerbung' : 'Bewerbungen'}
+            {'\u{1F4E5}'} {anzahl} {anzahl === 1 ? 'Angebot' : 'Angebote'}
           </Text>
         ) : (
-          <Text style={styles.bewerbungenLeer}>Noch keine Bewerbungen</Text>
+          <Text style={styles.bewerbungenLeer}>Noch keine Angebote</Text>
         )}
       </View>
     </View>
@@ -219,19 +219,19 @@ export function AuftraggeberHome() {
           auftraege.length > 0 ? (
             <Text style={styles.summary}>
               {auftraege.length} {auftraege.length === 1 ? 'Ausschreibung' : 'Ausschreibungen'} ·{' '}
-              {gesamtBewerbungen} {gesamtBewerbungen === 1 ? 'Bewerbung' : 'Bewerbungen'} gesamt
+              {gesamtBewerbungen} {gesamtBewerbungen === 1 ? 'Angebot' : 'Angebote'} gesamt
             </Text>
           ) : null
         }
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyText}>
-              {error ? `Fehler: ${error}` : 'Du hast noch keine Ausschreibungen veröffentlicht.'}
+              {error ? `Fehler: ${error}` : 'Sie haben noch keine Ausschreibungen veröffentlicht.'}
             </Text>
             {!error ? (
               <Text style={styles.emptyHint}>
-                Neue Ausschreibungen legst du auf vergabo.de an. Hier siehst du den Status und
-                eingehende Bewerbungen.
+                Neue Ausschreibungen legen Sie auf vergabo.de an. Hier sehen Sie den Status und
+                eingehende Angebote.
               </Text>
             ) : null}
           </View>

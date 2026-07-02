@@ -11,7 +11,7 @@ export default function RegistrierenAuswahl() {
       <View style={styles.brandBlock}>
         <VergaboLogo size={64} />
         <Text style={styles.brand}>Jetzt registrieren</Text>
-        <Text style={styles.subtitle}>Wofür möchtest du dich registrieren?</Text>
+        <Text style={styles.subtitle}>Wofür möchten Sie sich registrieren?</Text>
       </View>
 
       <Pressable

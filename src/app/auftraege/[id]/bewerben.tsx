@@ -232,7 +232,7 @@ export default function BewerbenScreen() {
       const { data: sess } = await supabase.auth.getSession()
       const token = sess.session?.access_token
       if (!token) {
-        Alert.alert('Nicht angemeldet', 'Bitte melde dich erneut an.')
+        Alert.alert('Nicht angemeldet', 'Bitte melden Sie sich erneut an.')
         setSubmitting(false)
         return
       }
@@ -294,7 +294,7 @@ export default function BewerbenScreen() {
       setSuccess(true)
       setSubmitting(false)
     } catch {
-      Alert.alert('Netzwerkfehler', 'Das Angebot konnte nicht gesendet werden. Prüfe deine Verbindung.')
+      Alert.alert('Netzwerkfehler', 'Das Angebot konnte nicht gesendet werden. Prüfen Sie Ihre Verbindung.')
       setSubmitting(false)
     }
   }
@@ -329,7 +329,7 @@ export default function BewerbenScreen() {
         <Text style={{ fontSize: 48 }}>🎉</Text>
         <Text style={styles.successTitle}>Angebot eingereicht!</Text>
         <Text style={styles.successText}>
-          Der Auftraggeber prüft dein Angebot und meldet sich bei dir.
+          Der Auftraggeber prüft Ihr Angebot und meldet sich bei Ihnen.
         </Text>
         <Pressable style={styles.submitBtn} onPress={() => router.replace('/')}>
           <Text style={styles.submitText}>Zurück zur Übersicht</Text>
@@ -540,12 +540,12 @@ export default function BewerbenScreen() {
 
         {/* Beschreibung */}
         <View style={styles.field}>
-          <Text style={styles.label}>Kurzbeschreibung deines Angebots</Text>
+          <Text style={styles.label}>Kurzbeschreibung Ihres Angebots</Text>
           <TextInput
             style={[styles.input, styles.textarea]}
             value={beschreibung}
             onChangeText={setBeschreibung}
-            placeholder="Wie gehst du die Aufgabe an?"
+            placeholder="Wie gehen Sie die Aufgabe an?"
             placeholderTextColor={C.muted}
             multiline
             numberOfLines={4}

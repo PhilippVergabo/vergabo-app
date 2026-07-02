@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 // Abmelden mit Rückfrage — verhindert, dass ein versehentlicher Tap auf
 // "Abmelden" die Sitzung sofort beendet.
 export function abmeldenMitBestaetigung() {
-  Alert.alert('Abmelden', 'Möchtest du dich wirklich abmelden?', [
+  Alert.alert('Abmelden', 'Möchten Sie sich wirklich abmelden?', [
     { text: 'Abbrechen', style: 'cancel' },
     {
       text: 'Abmelden',

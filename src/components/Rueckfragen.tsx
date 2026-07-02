@@ -145,7 +145,7 @@ export function Rueckfragen({ auftragId }: { auftragId: string }) {
         <ActivityIndicator color={C.primary} style={{ paddingVertical: 16 }} />
       ) : nachrichten.length === 0 ? (
         <Text style={styles.leerText}>
-          Noch keine Rückfragen. Du kannst auch vor einer Bewerbung Fragen stellen.
+          Noch keine Rückfragen. Sie können auch vor der Angebotsabgabe Fragen stellen.
         </Text>
       ) : (
         <View style={styles.thread}>
