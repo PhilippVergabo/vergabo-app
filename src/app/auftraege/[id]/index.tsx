@@ -4,6 +4,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { budgetRange } from '@/lib/budgetRange'
 import { gewerkLabel } from '@/lib/labels'
+import { Rueckfragen } from '@/components/Rueckfragen'
 import { C } from '@/lib/theme'
 
 type AuftragDetail = {
@@ -144,6 +145,10 @@ export default function AuftragDetailScreen() {
           </View>
         )}
       </View>
+
+      {/* Öffentliches Q&A – auch vor einer Bewerbung möglich (RLS erlaubt es
+          für veröffentlichte Aufträge; nur Rollen-Badges, keine Firmennamen). */}
+      <Rueckfragen auftragId={auftrag.id} />
     </ScrollView>
   )
 }
