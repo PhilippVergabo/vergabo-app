@@ -45,6 +45,8 @@ export function AnbieterHome() {
   const [error, setError] = useState<string | null>(null)
   const [suche, setSuche] = useState('')
   const [gewerkFilter, setGewerkFilter] = useState<string | null>(null)
+  // null = noch unbekannt (kein Banner-Flackern beim Laden)
+  const [verifiziert, setVerifiziert] = useState<boolean | null>(null)
 
   // In den Daten vorhandene Gewerke (für die Filter-Chips)
   const vorhandeneGewerke = useMemo(() => {
@@ -67,19 +69,24 @@ export function AnbieterHome() {
   }, [auftraege, suche, gewerkFilter])
 
   const loadData = useCallback(async () => {
-    const [{ data: auftraegeData, error: auftraegeError }, { data: bewerbungenData }] =
-      await Promise.all([
-        supabase
-          .from('auftraege')
-          .select(
-            'id, titel, gewerk, ausfuehrungsort_plz, ausfuehrungsort_ort, frist:angebotsfrist, budget_max:budget_bis, created_at:erstellt_am',
-          )
-          .eq('status', 'veroeffentlicht')
-          .eq('vergabeverfahren', 'direktauftrag')
-          .order('erstellt_am', { ascending: false }),
-        // RLS liefert dem Anbieter nur die EIGENEN Bewerbungen
-        supabase.from('bewerbungen').select('auftrag_id, angebotspreis_netto'),
-      ])
+    const [
+      { data: auftraegeData, error: auftraegeError },
+      { data: bewerbungenData },
+      { data: profilData },
+    ] = await Promise.all([
+      supabase
+        .from('auftraege')
+        .select(
+          'id, titel, gewerk, ausfuehrungsort_plz, ausfuehrungsort_ort, frist:angebotsfrist, budget_max:budget_bis, created_at:erstellt_am',
+        )
+        .eq('status', 'veroeffentlicht')
+        .eq('vergabeverfahren', 'direktauftrag')
+        .order('erstellt_am', { ascending: false }),
+      // RLS liefert dem Anbieter nur die EIGENEN Bewerbungen
+      supabase.from('bewerbungen').select('auftrag_id, angebotspreis_netto'),
+      // Own-Row-RLS: liefert nur das eigene Profil (für den Verifizierungs-Hinweis)
+      supabase.from('anbieter_profile').select('verifiziert').maybeSingle(),
+    ])
 
     if (auftraegeError) {
       setError(auftraegeError.message)
@@ -92,6 +99,7 @@ export function AnbieterHome() {
       angebote.set(b.auftrag_id, b.angebotspreis_netto ?? null)
     }
     setMeineAngebote(angebote)
+    setVerifiziert(profilData?.verifiziert ?? null)
   }, [])
 
   // Bei jedem Fokus neu laden, damit der "Beworben"-Status nach dem Einreichen
@@ -132,9 +140,19 @@ export function AnbieterHome() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Ausschreibungen</Text>
-        <Pressable onPress={abmeldenMitBestaetigung} hitSlop={8} accessibilityRole="button">
-          <Text style={styles.logout}>Abmelden</Text>
-        </Pressable>
+        <View style={styles.headerAktionen}>
+          <Pressable
+            onPress={() => router.push('/eigenerklarungen')}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Nachweise und Erklärungen verwalten"
+          >
+            <Text style={styles.headerLink}>Nachweise</Text>
+          </Pressable>
+          <Pressable onPress={abmeldenMitBestaetigung} hitSlop={8} accessibilityRole="button">
+            <Text style={styles.logout}>Abmelden</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.filterBar}>
@@ -182,6 +200,20 @@ export function AnbieterHome() {
           </ScrollView>
         ) : null}
       </View>
+
+      {verifiziert === false ? (
+        <Pressable
+          style={styles.verifBanner}
+          onPress={() => router.push('/eigenerklarungen')}
+          accessibilityRole="button"
+          accessibilityLabel="Konto noch nicht verifiziert – Nachweise hochladen"
+        >
+          <Text style={styles.verifBannerText}>
+            ⏳ Dein Konto ist noch nicht verifiziert – Zuschläge sind erst nach der Verifizierung
+            möglich. <Text style={styles.verifBannerLink}>Nachweise hochladen →</Text>
+          </Text>
+        </Pressable>
+      ) : null}
 
       <FlatList
         data={gefilterteAuftraege}
@@ -237,6 +269,8 @@ const styles = StyleSheet.create({
     borderBottomColor: C.border,
   },
   headerTitle: { fontSize: 20, fontWeight: '700', color: C.text },
+  headerAktionen: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  headerLink: { fontSize: 14, color: C.primary, fontWeight: '600' },
   logout: { fontSize: 14, color: C.muted },
   filterBar: {
     paddingTop: 12,
@@ -266,6 +300,18 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 13, fontWeight: '600' },
   chipTextAktiv: { color: '#ffffff' },
   chipTextInaktiv: { color: C.muted },
+  verifBanner: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: C.warn,
+    borderWidth: 1,
+    borderColor: C.accent,
+    borderRadius: 10,
+  },
+  verifBannerText: { fontSize: 13, color: C.accent, lineHeight: 19 },
+  verifBannerLink: { fontWeight: '700', textDecorationLine: 'underline' },
   count: { fontSize: 12, color: C.muted, marginBottom: 12 },
   list: { padding: 16 },
   empty: { paddingTop: 64, alignItems: 'center' },
