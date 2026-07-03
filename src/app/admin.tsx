@@ -12,12 +12,12 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import * as WebBrowser from 'expo-web-browser'
 import { supabase } from '@/lib/supabase'
 import { authedFetch } from '@/lib/authedFetch'
 import { GEWERK_LABELS } from '@/lib/labels'
-import { erklaerungLabel } from '@/lib/eigenerklarungTypen'
 import { C } from '@/lib/theme'
+import { AdminKarte, type AdminEintrag, type Tab } from '@/components/admin/AdminKarte'
+import { type AdminDokument } from '@/components/admin/NachweisBadge'
 
 type AdminAnbieter = {
   id: string
@@ -38,30 +38,6 @@ type AdminAuftraggeber = {
   organisation_typ: string | null
   verifiziert: boolean
 }
-
-// Hochgeladene Nachweise/Eigenerklärungen eines Anbieters (Admin-Sicht).
-// url = kurzlebige Signed-URL zum Öffnen der Datei (null = keine Datei).
-type AdminDokument = {
-  id: string
-  typ: string
-  dateiname: string | null
-  bestaetigt: boolean | null
-  admin_verifiziert: boolean | null
-  admin_abgelehnt: boolean | null
-  url: string | null
-}
-
-// Einheitliches Karten-Modell: beide Rollen werden beim Laden hierauf
-// normalisiert, damit Liste + Aktionen nur EIN Gerüst brauchen.
-type AdminEintrag = {
-  id: string
-  titel: string
-  zeilen: string[] // gedämpfte Meta-Zeilen (Person, PLZ + Ort)
-  akzent: string // Akzent-Zeile (Gewerke bzw. Organisationstyp)
-  verifiziert: boolean
-}
-
-type Tab = 'anbieter' | 'auftraggeber'
 
 const ORG_TYP_LABELS: Record<string, string> = {
   kommune: 'Kommune',
@@ -115,21 +91,6 @@ const TAB_CONFIG: Record<
 }
 
 type Phase = 'checking' | 'mfa' | 'ready' | 'error'
-
-// Status-Logik wie StatusBadge in eigenerklarungen.tsx (Anbieter-Sicht),
-// damit Admin und Anbieter denselben Zustand sehen.
-function NachweisBadge({ d }: { d: AdminDokument }) {
-  if (!d.bestaetigt && !d.dateiname) {
-    return <Text style={[styles.dokBadge, styles.dokBadgeFehlt]}>fehlt</Text>
-  }
-  if (d.admin_verifiziert) {
-    return <Text style={[styles.dokBadge, styles.dokBadgeOk]}>✓ freigegeben</Text>
-  }
-  if (d.admin_abgelehnt) {
-    return <Text style={[styles.dokBadge, styles.dokBadgeAbgelehnt]}>✕ abgelehnt</Text>
-  }
-  return <Text style={[styles.dokBadge, styles.dokBadgeWartet]}>⏳ in Prüfung</Text>
-}
 
 export default function AdminScreen() {
   const [phase, setPhase] = useState<Phase>('checking')
@@ -386,112 +347,18 @@ export default function AdminScreen() {
           </Text>
         }
         ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-        renderItem={({ item }) => {
-          const busy = busyId === item.id
-          return (
-            <View style={styles.cardItem}>
-              <View style={styles.cardHead}>
-                <Text style={styles.titel} numberOfLines={2}>
-                  {item.titel}
-                </Text>
-                {item.verifiziert ? (
-                  <View style={[styles.badge, styles.badgeOk]}>
-                    <Text style={styles.badgeOkText}>✓ Verifiziert</Text>
-                  </View>
-                ) : (
-                  <View style={[styles.badge, styles.badgeWarn]}>
-                    <Text style={styles.badgeWarnText}>Offen</Text>
-                  </View>
-                )}
-              </View>
-              {item.zeilen.map((zeile, i) => (
-                <Text key={i} style={styles.meta}>
-                  {zeile}
-                </Text>
-              ))}
-              {item.akzent ? <Text style={styles.metaAkzent}>{item.akzent}</Text> : null}
-
-              {tab === 'anbieter' ? (
-                <View style={styles.nachweisBereich}>
-                  <Pressable
-                    onPress={() => toggleNachweise(item.id)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Nachweise von ${item.titel} ${nachweiseOffen[item.id] ? 'ausblenden' : 'anzeigen'}`}
-                  >
-                    <Text style={styles.nachweisToggle}>
-                      {nachweiseOffen[item.id] ? '▾ Nachweise ausblenden' : '▸ Nachweise anzeigen'}
-                    </Text>
-                  </Pressable>
-                  {nachweiseOffen[item.id] ? (
-                    nachweiseLadenId === item.id ? (
-                      <ActivityIndicator color={C.primary} style={{ marginTop: 8 }} />
-                    ) : nachweise[item.id] != null ? (
-                      nachweise[item.id]!.length === 0 ? (
-                        <Text style={[styles.meta, { marginTop: 8 }]}>Keine Nachweise hinterlegt.</Text>
-                      ) : (
-                        nachweise[item.id]!.map((d) => (
-                          <View key={d.id} style={styles.dokRow}>
-                            <View style={{ flex: 1, gap: 2 }}>
-                              <Text style={styles.dokTyp}>{erklaerungLabel(d.typ)}</Text>
-                              <Text style={styles.dokDatei} numberOfLines={1}>
-                                {d.dateiname ? `📎 ${d.dateiname}` : 'keine Datei hinterlegt'}
-                              </Text>
-                            </View>
-                            <NachweisBadge d={d} />
-                            {d.url ? (
-                              <Pressable
-                                style={styles.dokOeffnenBtn}
-                                onPress={() => WebBrowser.openBrowserAsync(d.url!)}
-                                accessibilityRole="button"
-                                accessibilityLabel={`${erklaerungLabel(d.typ)} öffnen`}
-                              >
-                                <Text style={styles.dokOeffnenText}>Öffnen</Text>
-                              </Pressable>
-                            ) : null}
-                          </View>
-                        ))
-                      )
-                    ) : null
-                  ) : null}
-                </View>
-              ) : null}
-
-              <View style={styles.aktionRow}>
-                {item.verifiziert ? (
-                  <Pressable
-                    style={[styles.sperrBtn, busy && styles.btnDisabled]}
-                    disabled={busy}
-                    onPress={() => setVerifiziert(tab, item, false)}
-                    accessibilityRole="button"
-                    accessibilityState={{ disabled: busy, busy }}
-                    accessibilityLabel={`Verifizierung von ${item.titel} entziehen`}
-                  >
-                    {busy ? (
-                      <ActivityIndicator size="small" color="#9a4a35" />
-                    ) : (
-                      <Text style={styles.sperrBtnText}>Verifizierung entziehen</Text>
-                    )}
-                  </Pressable>
-                ) : (
-                  <Pressable
-                    style={[styles.verifyBtn, busy && styles.btnDisabled]}
-                    disabled={busy}
-                    onPress={() => setVerifiziert(tab, item, true)}
-                    accessibilityRole="button"
-                    accessibilityState={{ disabled: busy, busy }}
-                    accessibilityLabel={`${item.titel} verifizieren`}
-                  >
-                    {busy ? (
-                      <ActivityIndicator size="small" color="#ffffff" />
-                    ) : (
-                      <Text style={styles.verifyBtnText}>✓ Verifizieren</Text>
-                    )}
-                  </Pressable>
-                )}
-              </View>
-            </View>
-          )
-        }}
+        renderItem={({ item }) => (
+          <AdminKarte
+            item={item}
+            tab={tab}
+            busy={busyId === item.id}
+            onSetVerifiziert={(verifizieren) => setVerifiziert(tab, item, verifizieren)}
+            nachweisDokumente={nachweise[item.id] ?? null}
+            nachweisOffen={!!nachweiseOffen[item.id]}
+            nachweisLaedt={nachweiseLadenId === item.id}
+            onToggleNachweise={() => toggleNachweise(item.id)}
+          />
+        )}
         ListEmptyComponent={
           <View style={{ paddingTop: 64, alignItems: 'center' }}>
             <Text style={styles.muted}>{ladenListe ? 'Wird geladen …' : konfig.leerText}</Text>
@@ -551,69 +418,4 @@ const styles = StyleSheet.create({
   segmentTextAktiv: { color: '#fff' },
   list: { padding: 16 },
   summary: { fontSize: 12, color: C.muted, marginBottom: 12 },
-  cardItem: {
-    backgroundColor: C.card,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: C.border,
-    gap: 5,
-  },
-  cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
-  titel: { fontSize: 16, fontWeight: '600', color: C.text, flex: 1 },
-  badge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  badgeOk: { backgroundColor: C.ok },
-  badgeOkText: { fontSize: 11, fontWeight: '700', color: C.primary },
-  badgeWarn: { backgroundColor: '#fdf3ea' },
-  badgeWarnText: { fontSize: 11, fontWeight: '700', color: C.accent },
-  meta: { fontSize: 13, color: C.muted },
-  metaAkzent: { fontSize: 13, color: C.accent, fontWeight: '500' },
-  nachweisBereich: { marginTop: 8, borderTopWidth: 1, borderTopColor: C.border, paddingTop: 10 },
-  nachweisToggle: { fontSize: 13, fontWeight: '600', color: C.primary },
-  dokRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 10,
-    backgroundColor: C.field,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  dokTyp: { fontSize: 13, fontWeight: '600', color: C.text },
-  dokDatei: { fontSize: 12, color: C.muted },
-  dokBadge: {
-    fontSize: 11,
-    fontWeight: '700',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  dokBadgeFehlt: { backgroundColor: C.card, color: C.muted },
-  dokBadgeOk: { backgroundColor: C.ok, color: C.primary },
-  dokBadgeWartet: { backgroundColor: C.warn, color: C.accent },
-  dokBadgeAbgelehnt: { backgroundColor: '#f7e3df', color: '#7a3320' },
-  dokOeffnenBtn: {
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.card,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  dokOeffnenText: { fontSize: 12, fontWeight: '600', color: C.text },
-  aktionRow: { marginTop: 10, flexDirection: 'row' },
-  verifyBtn: { flex: 1, backgroundColor: C.primary, borderRadius: 8, paddingVertical: 11, alignItems: 'center' },
-  verifyBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  sperrBtn: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#9a4a3540',
-    backgroundColor: '#f5e6e2',
-    borderRadius: 8,
-    paddingVertical: 11,
-    alignItems: 'center',
-  },
-  sperrBtnText: { color: '#9a4a35', fontSize: 14, fontWeight: '600' },
 })
