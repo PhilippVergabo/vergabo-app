@@ -25,6 +25,9 @@ type Props = {
   nachweisOffen: boolean
   nachweisLaedt: boolean
   onToggleNachweise: () => void
+  /** id des Nachweises, dessen Freigabe/Ablehnung gerade läuft (null = keine). */
+  nachweisBusyDokId: string | null
+  onNachweisEntscheiden: (dok: AdminDokument, aktion: 'freigeben' | 'ablehnen') => void
 }
 
 // Eine Karte der Admin-Liste (Anbieter ODER Auftraggeber). 1:1 aus dem
@@ -38,6 +41,8 @@ export function AdminKarte({
   nachweisOffen,
   nachweisLaedt,
   onToggleNachweise,
+  nachweisBusyDokId,
+  onNachweisEntscheiden,
 }: Props) {
   return (
     <View style={styles.cardItem}>
@@ -69,6 +74,8 @@ export function AdminKarte({
           offen={nachweisOffen}
           laedt={nachweisLaedt}
           onToggle={onToggleNachweise}
+          busyDokId={nachweisBusyDokId}
+          onEntscheiden={onNachweisEntscheiden}
         />
       ) : null}
 

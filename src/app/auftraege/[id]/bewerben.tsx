@@ -187,7 +187,6 @@ export default function BewerbenScreen() {
   const canSubmit =
     gesamtpreis > 0 &&
     ausfuehrungszeitraum.trim().length > 0 &&
-    beschreibung.trim().length > 0 &&
     pflichtKriterienErfuellt &&
     verpflichtungenAlleBestaetigt &&
     !submitting
@@ -393,7 +392,7 @@ export default function BewerbenScreen() {
         </Pressable>
         {!canSubmit && !submitting ? (
           <Text style={styles.gateHint}>
-            Bitte Kalkulation, Ausführungszeitraum, Beschreibung sowie alle Pflichtnachweise und
+            Bitte Kalkulation, Ausführungszeitraum sowie alle Pflichtnachweise und
             Verpflichtungserklärungen ausfüllen.
           </Text>
         ) : null}

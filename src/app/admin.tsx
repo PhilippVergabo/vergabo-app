@@ -113,6 +113,7 @@ export default function AdminScreen() {
   const [nachweise, setNachweise] = useState<Record<string, AdminDokument[] | null>>({})
   const [nachweiseOffen, setNachweiseOffen] = useState<Record<string, boolean>>({})
   const [nachweiseLadenId, setNachweiseLadenId] = useState<string | null>(null)
+  const [nachweisBusyDokId, setNachweisBusyDokId] = useState<string | null>(null)
 
   const ladeListe = useCallback(async (t: Tab) => {
     setLadenListe(true)
@@ -224,6 +225,48 @@ export default function AdminScreen() {
       Alert.alert('Netzwerkfehler', 'Die Nachweise konnten nicht geladen werden. Bitte versuchen Sie es erneut.')
     } finally {
       setNachweiseLadenId(null)
+    }
+  }
+
+  // Einzelnen Nachweis freigeben/ablehnen; bei Erfolg den Cache patchen
+  // (Flags wie serverseitig gesetzt: freigeben ↔ ablehnen schließen sich aus).
+  async function entscheideNachweis(
+    anbieterId: string,
+    dok: AdminDokument,
+    aktion: 'freigeben' | 'ablehnen',
+  ) {
+    setNachweisBusyDokId(dok.id)
+    try {
+      const res = await authedFetch('/api/app-admin/eigenerklarungen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: dok.id, aktion }),
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        if ((j as { error?: string }).error === 'mfa_required') {
+          setPhase('mfa')
+          return
+        }
+        Alert.alert('Fehlgeschlagen', (j as { error?: string }).error ?? 'Aktion nicht möglich.')
+        return
+      }
+      setNachweise((prev) => ({
+        ...prev,
+        [anbieterId]: (prev[anbieterId] ?? []).map((d) =>
+          d.id === dok.id
+            ? {
+                ...d,
+                admin_verifiziert: aktion === 'freigeben',
+                admin_abgelehnt: aktion === 'ablehnen',
+              }
+            : d,
+        ),
+      }))
+    } catch {
+      Alert.alert('Netzwerkfehler', 'Aktion konnte nicht gesendet werden.')
+    } finally {
+      setNachweisBusyDokId(null)
     }
   }
 
@@ -357,6 +400,8 @@ export default function AdminScreen() {
             nachweisOffen={!!nachweiseOffen[item.id]}
             nachweisLaedt={nachweiseLadenId === item.id}
             onToggleNachweise={() => toggleNachweise(item.id)}
+            nachweisBusyDokId={nachweisBusyDokId}
+            onNachweisEntscheiden={(dok, aktion) => entscheideNachweis(item.id, dok, aktion)}
           />
         )}
         ListEmptyComponent={

@@ -11,7 +11,7 @@ type Props = {
   setReferenzen: (v: string) => void
 }
 
-// Basis-Textfelder des Angebots (Ausführungszeitraum, Kurzbeschreibung, Referenzen).
+// Basis-Textfelder des Angebots (Ausführungszeitraum, Anmerkung, Referenzen).
 // 1:1 aus bewerben.tsx/bearbeiten.tsx verschoben (dort identisch). Fragment statt
 // Wrapper-View, damit das gap der ScrollView weiterhin zwischen den Feldern greift.
 export function BasisFelder({
@@ -36,14 +36,14 @@ export function BasisFelder({
         />
       </View>
 
-      {/* Beschreibung */}
+      {/* Anmerkung (optional — wie im Web-Wizard; Server akzeptiert leeres Feld) */}
       <View style={styles.field}>
-        <Text style={styles.label}>Kurzbeschreibung Ihres Angebots</Text>
+        <Text style={styles.label}>Anmerkung (optional)</Text>
         <TextInput
           style={[styles.input, styles.textarea]}
           value={beschreibung}
           onChangeText={setBeschreibung}
-          placeholder="Wie gehen Sie die Aufgabe an?"
+          placeholder="Optional: kurze Anmerkung zu Ihrem Angebot (z. B. Besonderheiten, Hinweise) …"
           placeholderTextColor={C.muted}
           multiline
           numberOfLines={4}

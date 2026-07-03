@@ -137,6 +137,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: C.text,
     backgroundColor: C.bg,
+    // Explizit 0: Fabric recycelt native TextInput-Views — ohne gesetzten Wert
+    // "erbt" der Placeholder sonst sporadisch letterSpacing eines anderen
+    // Inputs (z. B. codeInput in admin.tsx mit letterSpacing: 8 → „E - M a i l").
+    letterSpacing: 0,
   },
   button: {
     backgroundColor: C.primary,
