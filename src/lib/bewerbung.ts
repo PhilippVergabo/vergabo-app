@@ -2,6 +2,8 @@
 // Gespiegelt aus der Web-Plattform (lib/lvTypes, lib/uploadValidation,
 // components/Eignungskriterien) — bewusst 1:1, damit App und Web identische
 // Datenstrukturen und Regeln verwenden.
+import { Alert } from 'react-native'
+import * as DocumentPicker from 'expo-document-picker'
 
 // ── Freie Positionen (ohne Leistungsverzeichnis) ────────────────────────────
 export interface Position {
@@ -86,4 +88,38 @@ export function validiereDatei(file: { name: string; size: number }): { ok: bool
 // Preis-Formatierung (de-DE, 2 Nachkommastellen)
 export function fmtPreis(n: number): string {
   return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+// ── Dateiauswahl für Angebotsanhänge/Nachweise ──────────────────────────────
+// Vorher identisch in bewerben.tsx und bearbeiten.tsx dupliziert.
+
+export type PickedFile = { uri: string; name: string; size: number; mimeType?: string }
+
+// React Native FormData akzeptiert { uri, name, type }; der Blob-Cast
+// überbrückt nur die DOM-Typdefinition.
+export function toFormFile(f: PickedFile) {
+  return { uri: f.uri, name: f.name, type: f.mimeType ?? 'application/octet-stream' } as unknown as Blob
+}
+
+// Öffnet den Dokument-Picker und validiert die Auswahl (Allowlist + Größe).
+// Gibt null zurück bei Abbruch oder abgelehnter Datei (Alert wird gezeigt).
+export async function dateiWaehlen(): Promise<PickedFile | null> {
+  try {
+    const res = await DocumentPicker.getDocumentAsync({
+      copyToCacheDirectory: true,
+      type: ['application/pdf', 'image/png', 'image/jpeg', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+    })
+    if (res.canceled || !res.assets?.[0]) return null
+    const a = res.assets[0]
+    const file: PickedFile = { uri: a.uri, name: a.name, size: a.size ?? 0, mimeType: a.mimeType ?? undefined }
+    const v = validiereDatei({ name: file.name, size: file.size })
+    if (!v.ok) {
+      Alert.alert('Datei abgelehnt', `${file.name}: ${v.fehler}`)
+      return null
+    }
+    return file
+  } catch (e) {
+    Alert.alert('Dateiauswahl fehlgeschlagen', e instanceof Error ? e.message : String(e))
+    return null
+  }
 }

@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native'
 import { supabase } from '@/lib/supabase'
-import { API_URL } from '@/lib/config'
+import { authedFetch } from '@/lib/authedFetch'
 import { C } from '@/lib/theme'
 
 // Spiegel von vergabo/components/Rueckfragen.tsx (Web). Öffentliches Q&A zum
@@ -72,12 +72,10 @@ export function Rueckfragen({ auftragId }: { auftragId: string }) {
     async (eigeneIstAuftraggeber: boolean) => {
       try {
         const { data: sessionData } = await supabase.auth.getSession()
-        const token = sessionData.session?.access_token
-        if (!token) return
+        if (!sessionData.session?.access_token) return
         const post = (typ: string, empfaengerId: string) =>
-          fetch(`${API_URL}/api/benachrichtigung`, {
+          authedFetch('/api/benachrichtigung', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
             body: JSON.stringify({
               typ,
               userId: empfaengerId,
@@ -139,7 +137,17 @@ export function Rueckfragen({ auftragId }: { auftragId: string }) {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>Rückfragen ({nachrichten.length})</Text>
+      <View style={styles.kopfZeile}>
+        <Text style={styles.cardTitle}>Rückfragen ({nachrichten.length})</Text>
+        <Pressable
+          onPress={() => load()}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Rückfragen aktualisieren"
+        >
+          <Text style={styles.aktualisieren}>Aktualisieren</Text>
+        </Pressable>
+      </View>
 
       {laden ? (
         <ActivityIndicator color={C.primary} style={{ paddingVertical: 16 }} />
@@ -178,6 +186,9 @@ export function Rueckfragen({ auftragId }: { auftragId: string }) {
           placeholder="Frage stellen oder antworten …"
           placeholderTextColor={C.muted}
           multiline
+          returnKeyType="send"
+          submitBehavior="blurAndSubmit"
+          onSubmitEditing={handleSenden}
           accessibilityLabel="Frage stellen oder antworten"
         />
         <Pressable
@@ -203,6 +214,7 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
   },
+  kopfZeile: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardTitle: {
     fontSize: 12,
     fontWeight: '600',
@@ -210,6 +222,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
+  aktualisieren: { fontSize: 12, fontWeight: '600', color: C.primary },
   leerText: { fontSize: 14, color: C.muted, textAlign: 'center', paddingVertical: 8 },
   thread: { gap: 10 },
   bubbleZeile: { flexDirection: 'row' },

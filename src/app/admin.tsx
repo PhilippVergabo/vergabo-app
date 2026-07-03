@@ -14,7 +14,7 @@ import {
 } from 'react-native'
 import * as WebBrowser from 'expo-web-browser'
 import { supabase } from '@/lib/supabase'
-import { API_URL } from '@/lib/config'
+import { authedFetch } from '@/lib/authedFetch'
 import { GEWERK_LABELS } from '@/lib/labels'
 import { erklaerungLabel } from '@/lib/eigenerklarungTypen'
 import { C } from '@/lib/theme'
@@ -115,15 +115,6 @@ const TAB_CONFIG: Record<
 }
 
 type Phase = 'checking' | 'mfa' | 'ready' | 'error'
-
-async function authedFetch(path: string, init?: RequestInit) {
-  const { data: sess } = await supabase.auth.getSession()
-  const token = sess.session?.access_token
-  return fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}` },
-  })
-}
 
 // Status-Logik wie StatusBadge in eigenerklarungen.tsx (Anbieter-Sicht),
 // damit Admin und Anbieter denselben Zustand sehen.
@@ -248,7 +239,9 @@ export default function AdminScreen() {
 
     setNachweiseLadenId(anbieterId)
     try {
-      const res = await authedFetch(`/api/app-admin/eigenerklarungen?anbieter_id=${anbieterId}`)
+      const res = await authedFetch(
+        `/api/app-admin/eigenerklarungen?anbieter_id=${encodeURIComponent(anbieterId)}`,
+      )
       if (!res.ok) {
         const j = await res.json().catch(() => ({}))
         if ((j as { error?: string }).error === 'mfa_required') {
@@ -469,16 +462,30 @@ export default function AdminScreen() {
                     style={[styles.sperrBtn, busy && styles.btnDisabled]}
                     disabled={busy}
                     onPress={() => setVerifiziert(tab, item, false)}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: busy, busy }}
+                    accessibilityLabel={`Verifizierung von ${item.titel} entziehen`}
                   >
-                    <Text style={styles.sperrBtnText}>{busy ? '…' : 'Verifizierung entziehen'}</Text>
+                    {busy ? (
+                      <ActivityIndicator size="small" color="#9a4a35" />
+                    ) : (
+                      <Text style={styles.sperrBtnText}>Verifizierung entziehen</Text>
+                    )}
                   </Pressable>
                 ) : (
                   <Pressable
                     style={[styles.verifyBtn, busy && styles.btnDisabled]}
                     disabled={busy}
                     onPress={() => setVerifiziert(tab, item, true)}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: busy, busy }}
+                    accessibilityLabel={`${item.titel} verifizieren`}
                   >
-                    <Text style={styles.verifyBtnText}>{busy ? '…' : '✓ Verifizieren'}</Text>
+                    {busy ? (
+                      <ActivityIndicator size="small" color="#ffffff" />
+                    ) : (
+                      <Text style={styles.verifyBtnText}>✓ Verifizieren</Text>
+                    )}
                   </Pressable>
                 )}
               </View>

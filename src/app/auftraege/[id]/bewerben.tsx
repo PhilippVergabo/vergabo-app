@@ -12,27 +12,22 @@ import {
   View,
 } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import * as DocumentPicker from 'expo-document-picker'
 import { supabase } from '@/lib/supabase'
 import { PositionenEditor } from '@/components/PositionenEditor'
 import { LvEditor } from '@/components/LvEditor'
 import {
   NACHWEIS_TYP_LABELS,
+  dateiWaehlen,
   fmtPreis,
-  validiereDatei,
+  toFormFile,
   type Kriterium,
   type LvPosition,
   type LvPreis,
+  type PickedFile,
   type Position,
 } from '@/lib/bewerbung'
-import { API_URL } from '@/lib/config'
+import { authedFetch } from '@/lib/authedFetch'
 import { C } from '@/lib/theme'
-
-type PickedFile = { uri: string; name: string; size: number; mimeType?: string }
-
-function toFormFile(f: PickedFile) {
-  return { uri: f.uri, name: f.name, type: f.mimeType ?? 'application/octet-stream' } as unknown as Blob
-}
 
 export default function BewerbenScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -178,27 +173,6 @@ export default function BewerbenScreen() {
     }
   }, [id])
 
-  async function dateiWaehlen(): Promise<PickedFile | null> {
-    try {
-      const res = await DocumentPicker.getDocumentAsync({
-        copyToCacheDirectory: true,
-        type: ['application/pdf', 'image/png', 'image/jpeg', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
-      })
-      if (res.canceled || !res.assets?.[0]) return null
-      const a = res.assets[0]
-      const file: PickedFile = { uri: a.uri, name: a.name, size: a.size ?? 0, mimeType: a.mimeType ?? undefined }
-      const v = validiereDatei({ name: file.name, size: file.size })
-      if (!v.ok) {
-        Alert.alert('Datei abgelehnt', `${file.name}: ${v.fehler}`)
-        return null
-      }
-      return file
-    } catch (e) {
-      Alert.alert('Dateiauswahl fehlgeschlagen', e instanceof Error ? e.message : String(e))
-      return null
-    }
-  }
-
   async function nachweisWaehlen(kriteriumId: string) {
     const f = await dateiWaehlen()
     if (f) setNachweisDateien((prev) => ({ ...prev, [kriteriumId]: f }))
@@ -227,11 +201,11 @@ export default function BewerbenScreen() {
     !submitting
 
   async function handleSubmit() {
+    if (submitting) return
     setSubmitting(true)
     try {
       const { data: sess } = await supabase.auth.getSession()
-      const token = sess.session?.access_token
-      if (!token) {
+      if (!sess.session?.access_token) {
         Alert.alert('Nicht angemeldet', 'Bitte melden Sie sich erneut an.')
         setSubmitting(false)
         return
@@ -278,9 +252,9 @@ export default function BewerbenScreen() {
       }
       anhaenge.forEach((file, i) => fd.append(`anhang_${i}`, toFormFile(file)))
 
-      const res = await fetch(`${API_URL}/api/bewerbung/einreichen`, {
+      // FormData: authedFetch setzt hier bewusst keinen Content-Type
+      const res = await authedFetch('/api/bewerbung/einreichen', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
         body: fd,
       })
 
@@ -596,9 +570,9 @@ export default function BewerbenScreen() {
         <Pressable
           style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
           onPress={handleSubmit}
-          disabled={!canSubmit}
+          disabled={!canSubmit || submitting}
           accessibilityRole="button"
-          accessibilityState={{ disabled: !canSubmit, busy: submitting }}
+          accessibilityState={{ disabled: !canSubmit || submitting, busy: submitting }}
         >
           <Text style={styles.submitText}>{submitting ? 'Wird eingereicht …' : 'Angebot einreichen'}</Text>
         </Pressable>

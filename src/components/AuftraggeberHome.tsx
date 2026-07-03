@@ -13,19 +13,9 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { abmeldenMitBestaetigung } from '@/lib/auth'
 import { addPushTapListener, registriereFuerPush } from '@/lib/push'
-import { API_URL } from '@/lib/config'
-import { gewerkLabel } from '@/lib/labels'
+import { authedFetch } from '@/lib/authedFetch'
+import { auftragStatusStil, gewerkLabel } from '@/lib/labels'
 import { C } from '@/lib/theme'
-
-// Statuslabel + Farbe (Hintergrund, Text)
-const STATUS: Record<string, { label: string; bg: string; fg: string }> = {
-  entwurf: { label: 'Entwurf', bg: '#ece8df', fg: '#6b6b60' },
-  veroeffentlicht: { label: 'Veröffentlicht', bg: '#e8f0e9', fg: '#3a5a3e' },
-  in_pruefung: { label: 'In Prüfung', bg: '#fdf3ea', fg: '#c87941' },
-  vergeben: { label: 'Vergeben', bg: '#e6eef5', fg: '#2f5d8a' },
-  abgeschlossen: { label: 'Abgeschlossen', bg: '#ece8df', fg: '#6b6b60' },
-  storniert: { label: 'Storniert', bg: '#f5e6e2', fg: '#9a4a35' },
-}
 
 type AGAuftrag = {
   id: string
@@ -43,7 +33,7 @@ function formatDate(iso: string | null) {
 }
 
 function AuftraggeberKarte({ auftrag, anzahl }: { auftrag: AGAuftrag; anzahl: number }) {
-  const status = STATUS[auftrag.status] ?? { label: auftrag.status, bg: '#ece8df', fg: '#6b6b60' }
+  const status = auftragStatusStil(auftrag.status)
   const frist = formatDate(auftrag.angebotsfrist)
   const meta = [auftrag.gewerk ? gewerkLabel(auftrag.gewerk) : null, auftrag.ausfuehrungsort_ort]
     .filter(Boolean)
@@ -91,12 +81,9 @@ export function AuftraggeberHome() {
     let aktiv = true
     ;(async () => {
       const { data: sess } = await supabase.auth.getSession()
-      const token = sess.session?.access_token
-      if (!token) return
+      if (!sess.session?.access_token) return
       try {
-        const res = await fetch(`${API_URL}/api/app-admin/status`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        const res = await authedFetch('/api/app-admin/status')
         if (!res.ok) return
         const j = (await res.json()) as { isAdmin?: boolean }
         if (aktiv) setIstAdmin(!!j.isAdmin)

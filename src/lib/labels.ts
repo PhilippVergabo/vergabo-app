@@ -17,3 +17,22 @@ export function gewerkLabel(gewerk: string | null | undefined): string {
   if (!gewerk) return ''
   return GEWERK_LABELS[gewerk] ?? gewerk
 }
+
+// Auftragsstatus → Anzeige-Label + Badge-Farben (Hintergrund, Text).
+// Vorher lokal in AuftraggeberHome definiert.
+export type AuftragStatusStil = { label: string; bg: string; fg: string }
+
+export const AUFTRAG_STATUS: Record<string, AuftragStatusStil> = {
+  entwurf: { label: 'Entwurf', bg: '#ece8df', fg: '#6b6b60' },
+  veroeffentlicht: { label: 'Veröffentlicht', bg: '#e8f0e9', fg: '#3a5a3e' },
+  in_pruefung: { label: 'In Prüfung', bg: '#fdf3ea', fg: '#c87941' },
+  vergeben: { label: 'Vergeben', bg: '#e6eef5', fg: '#2f5d8a' },
+  abgeschlossen: { label: 'Abgeschlossen', bg: '#ece8df', fg: '#6b6b60' },
+  storniert: { label: 'Storniert', bg: '#f5e6e2', fg: '#9a4a35' },
+}
+
+// Status → Stil; unbekannte Status erhalten den neutralen Entwurf-Stil mit
+// dem rohen Status als Label (Verhalten wie zuvor in AuftraggeberHome).
+export function auftragStatusStil(status: string): AuftragStatusStil {
+  return AUFTRAG_STATUS[status] ?? { label: status, bg: '#ece8df', fg: '#6b6b60' }
+}

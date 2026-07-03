@@ -11,7 +11,7 @@ import {
 import { useFocusEffect } from 'expo-router'
 import * as DocumentPicker from 'expo-document-picker'
 import { supabase } from '@/lib/supabase'
-import { API_URL } from '@/lib/config'
+import { authedFetch } from '@/lib/authedFetch'
 import {
   ERKLAERUNG_TYPEN,
   EIGENERKLARUNG_UPLOAD,
@@ -82,7 +82,26 @@ export default function EigenerklarungenScreen() {
 
   const getErklaerung = (typ: string) => erklaerungen.find((e) => e.typ === typ)
 
-  async function hochladen(typ: string) {
+  // Rückfrage vor dem Ersetzen einer bereits hochgeladenen Datei — erst nach
+  // Bestätigung öffnet sich der Datei-Picker.
+  function hochladen(typ: string) {
+    if (!profilId || busyTyp) return
+    const bestehend = getErklaerung(typ)
+    if (bestehend?.dateiname) {
+      Alert.alert(
+        'Datei ersetzen',
+        `Möchten Sie die vorhandene Datei „${bestehend.dateiname}" durch eine neue ersetzen?`,
+        [
+          { text: 'Abbrechen', style: 'cancel' },
+          { text: 'Ersetzen', onPress: () => void dateiWaehlenUndHochladen(typ) },
+        ],
+      )
+      return
+    }
+    void dateiWaehlenUndHochladen(typ)
+  }
+
+  async function dateiWaehlenUndHochladen(typ: string) {
     if (!profilId || busyTyp) return
     const res = await DocumentPicker.getDocumentAsync({
       type: ['application/pdf', 'image/png', 'image/jpeg'],
@@ -113,11 +132,8 @@ export default function EigenerklarungenScreen() {
       }
 
       // Serverseitige Magic-Byte-Verifikation VOR dem DB-Eintrag
-      const { data: sessionData } = await supabase.auth.getSession()
-      const token = sessionData.session?.access_token
-      const verRes = await fetch(`${API_URL}/api/datei-verifizieren`, {
+      const verRes = await authedFetch('/api/datei-verifizieren', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ bucket: 'eigenerklarungen', pfad }),
       })
       if (!verRes.ok) {

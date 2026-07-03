@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { EINHEITEN, fmtPreis, type Position } from '@/lib/bewerbung'
 import { C } from '@/lib/theme'
 
@@ -57,6 +57,24 @@ export function PositionenEditor({ initialPositionen, onChange }: Props) {
     emit(positionen.filter((p) => p.id !== id))
   }
 
+  // Rückfrage nur bei ausgefüllten Positionen — leere Zeilen (keine
+  // Beschreibung, kein Preis) werden ohne Bestätigung entfernt.
+  function loeschenMitBestaetigung(p: Position) {
+    const istLeer = !p.beschreibung.trim() && !p.einzelpreis
+    if (istLeer) {
+      loeschen(p.id)
+      return
+    }
+    Alert.alert(
+      'Position löschen',
+      `Möchten Sie die Position „${p.beschreibung.trim() || 'ohne Beschreibung'}" wirklich löschen?`,
+      [
+        { text: 'Abbrechen', style: 'cancel' },
+        { text: 'Löschen', style: 'destructive', onPress: () => loeschen(p.id) },
+      ],
+    )
+  }
+
   function zyklusEinheit(id: string, aktuell: string) {
     const idx = EINHEITEN.indexOf(aktuell)
     const next = EINHEITEN[(idx + 1) % EINHEITEN.length]
@@ -76,7 +94,7 @@ export function PositionenEditor({ initialPositionen, onChange }: Props) {
               onChangeText={(t) => updatePosition(p.id, 'beschreibung', t)}
             />
             <Pressable
-              onPress={() => loeschen(p.id)}
+              onPress={() => loeschenMitBestaetigung(p)}
               hitSlop={8}
               style={styles.del}
               accessibilityRole="button"
@@ -99,7 +117,12 @@ export function PositionenEditor({ initialPositionen, onChange }: Props) {
             </View>
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>Einheit</Text>
-              <Pressable style={styles.einheitBtn} onPress={() => zyklusEinheit(p.id, p.einheit)}>
+              <Pressable
+                style={styles.einheitBtn}
+                onPress={() => zyklusEinheit(p.id, p.einheit)}
+                accessibilityRole="button"
+                accessibilityLabel={`Einheit ändern, aktuell ${p.einheit}`}
+              >
                 <Text style={styles.einheitText}>{p.einheit}</Text>
               </Pressable>
             </View>

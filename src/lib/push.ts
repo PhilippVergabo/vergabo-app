@@ -58,15 +58,20 @@ export async function registriereFuerPush(
   }
 }
 
+// Whitelist für Push-Deeplinks: ausschließlich Auftragsdetails
+// (/auftraege/<uuid>). Alles andere wird ignoriert, damit manipulierte
+// Notification-Daten keine beliebige Navigation auslösen können.
+const ERLAUBTER_PUSH_LINK = /^\/auftraege\/[0-9a-f-]{36}$/
+
 /**
  * Registriert einen Listener für das Antippen einer Push-Nachricht.
- * Ruft onTap mit dem `link` aus den Notification-Daten auf (z. B. /auftraege/<id>).
- * Gibt eine Cleanup-Funktion zurück.
+ * Ruft onTap mit dem `link` aus den Notification-Daten auf, aber nur wenn er
+ * der Whitelist entspricht (/auftraege/<uuid>). Gibt eine Cleanup-Funktion zurück.
  */
 export function addPushTapListener(onTap: (link: string) => void): () => void {
   const sub = Notifications.addNotificationResponseReceivedListener((response) => {
     const link = response.notification.request.content.data?.link
-    if (typeof link === 'string') onTap(link)
+    if (typeof link === 'string' && ERLAUBTER_PUSH_LINK.test(link)) onTap(link)
   })
   return () => sub.remove()
 }

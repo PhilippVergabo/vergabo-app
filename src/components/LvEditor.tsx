@@ -93,7 +93,7 @@ export function LvEditor({ positionen, initialPreise, onChange }: Props) {
         <Text style={styles.summeValue}>{fmtPreis(gesamtsumme)} €</Text>
       </View>
       <Text style={styles.hint}>
-        ℹ️ Trage je Position den Einheitspreis ein. Gesamtpreise und Summe werden automatisch berechnet.
+        ℹ️ Tragen Sie je Position den Einheitspreis ein. Gesamtpreise und Summe werden automatisch berechnet.
       </Text>
     </View>
   )
