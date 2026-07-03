@@ -1,0 +1,75 @@
+import { StyleSheet } from 'react-native'
+import { C } from '@/lib/theme'
+
+// Gemeinsame Styles der Angebots-Sektionen — 1:1 aus bewerben.tsx/bearbeiten.tsx
+// verschoben (Werte unverändert). Einzige Abweichung der beiden Screens war
+// uploadBtn.marginTop (6 nur in bearbeiten.tsx) — die Basis hier ist bewusst
+// OHNE marginTop; bearbeiten.tsx ergänzt ihn über die uploadBtnStyle-Prop.
+export const sektionStyles = StyleSheet.create({
+  field: { gap: 8 },
+  label: { fontSize: 12, fontWeight: '600', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.6 },
+  input: {
+    backgroundColor: C.card,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: C.text,
+  },
+  textarea: { minHeight: 90, textAlignVertical: 'top' },
+  kriterium: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  kriteriumCol: { padding: 12, borderRadius: 8, borderWidth: 1, gap: 8 },
+  kriteriumOk: { borderColor: C.primary, backgroundColor: C.ok },
+  kriteriumWarn: { borderColor: '#c8794166', backgroundColor: C.warn },
+  kriteriumNeutral: { borderColor: C.border, backgroundColor: C.card },
+  kriteriumText: { fontSize: 14, color: C.text, flexShrink: 1 },
+  stern: { color: C.accent },
+  checkOk: { fontSize: 16, color: C.primary, fontWeight: '700' },
+  checkEmpty: { fontSize: 16, color: C.muted },
+  tag: {
+    fontSize: 11,
+    color: C.primary,
+    fontWeight: '600',
+    marginLeft: 'auto',
+    borderWidth: 1,
+    borderColor: '#3a5a3e4d',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    overflow: 'hidden',
+  },
+  dateiRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  dateiName: { fontSize: 13, color: C.primary, flexShrink: 1 },
+  entfernen: { fontSize: 12, color: C.muted, textDecorationLine: 'underline' },
+  uploadBtn: {
+    backgroundColor: C.card,
+    borderWidth: 1,
+    borderColor: '#c8794166',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  uploadBtnText: { fontSize: 13, color: C.accent, fontWeight: '600' },
+  erwartet: { fontSize: 12, color: C.accent, marginTop: 6 },
+  verpflHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  textToggle: { fontSize: 12, color: C.muted, textDecorationLine: 'underline' },
+  verpflText: {
+    fontSize: 13,
+    color: '#3d3d38',
+    lineHeight: 19,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+    paddingTop: 8,
+  },
+  hint: { fontSize: 12, color: C.muted },
+})

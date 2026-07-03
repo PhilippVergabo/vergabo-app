@@ -13,11 +13,13 @@ import {
 } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { supabase } from '@/lib/supabase'
-import { PositionenEditor } from '@/components/PositionenEditor'
-import { LvEditor } from '@/components/LvEditor'
+import { AnhaengeSektion } from '@/components/angebot/AnhaengeSektion'
+import { BasisFelder } from '@/components/angebot/BasisFelder'
+import { KalkulationSektion } from '@/components/angebot/KalkulationSektion'
+import { NachweisSektion } from '@/components/angebot/NachweisSektion'
+import { VerpflichtungenSektion } from '@/components/angebot/VerpflichtungenSektion'
+import { sektionStyles } from '@/components/angebot/sektionStyles'
 import {
-  NACHWEIS_TYP_LABELS,
-  dateiWaehlen,
   fmtPreis,
   toFormFile,
   type Kriterium,
@@ -173,16 +175,6 @@ export default function BewerbenScreen() {
     }
   }, [id])
 
-  async function nachweisWaehlen(kriteriumId: string) {
-    const f = await dateiWaehlen()
-    if (f) setNachweisDateien((prev) => ({ ...prev, [kriteriumId]: f }))
-  }
-
-  async function anhangWaehlen() {
-    const f = await dateiWaehlen()
-    if (f) setAnhaenge((prev) => [...prev, f])
-  }
-
   const pflichtKriterienErfuellt = eignungskriterien
     .filter((k) => k.pflicht)
     .every((k) => {
@@ -331,10 +323,10 @@ export default function BewerbenScreen() {
         ) : null}
 
         {/* Angebotsnummer */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Angebotsnummer</Text>
+        <View style={sektionStyles.field}>
+          <Text style={sektionStyles.label}>Angebotsnummer</Text>
           <TextInput
-            style={styles.input}
+            style={sektionStyles.input}
             value={angebotsnummer}
             onChangeText={setAngebotsnummer}
             placeholder="z. B. 2026-001"
@@ -342,224 +334,47 @@ export default function BewerbenScreen() {
           />
         </View>
 
-        {/* Kalkulation */}
-        <View style={styles.field}>
-          <Text style={styles.label}>
-            {hatLv ? 'Leistungsverzeichnis – Einheitspreise' : 'Kalkulation'}
-          </Text>
-          {hatLv ? (
-            <LvEditor
-              positionen={lvPositionen}
-              onChange={(preise, summe) => {
-                setLvPreise(preise)
-                setGesamtpreis(summe)
-              }}
-            />
-          ) : (
-            <PositionenEditor
-              initialPositionen={agPositionen}
-              onChange={(pos, summe) => {
-                setPositionen(pos)
-                setGesamtpreis(summe)
-              }}
-            />
-          )}
-        </View>
+        <KalkulationSektion
+          hatLv={hatLv}
+          lvPositionen={lvPositionen}
+          initialPositionen={agPositionen}
+          onLvChange={(preise, summe) => {
+            setLvPreise(preise)
+            setGesamtpreis(summe)
+          }}
+          onPositionenChange={(pos, summe) => {
+            setPositionen(pos)
+            setGesamtpreis(summe)
+          }}
+        />
 
-        {/* Eignungsnachweise */}
-        {eignungskriterien.length > 0 ? (
-          <View style={styles.field}>
-            <Text style={styles.label}>Eignungsnachweis</Text>
-            <View style={{ gap: 8 }}>
-              {eignungskriterien.map((k) => {
-                if (k.nachweis_erforderlich) {
-                  const profilId = nachweisProfilMatch[k.id]
-                  const datei = nachweisDateien[k.id]
-                  if (profilId) {
-                    return (
-                      <View key={k.id} style={[styles.kriterium, styles.kriteriumOk]}>
-                        <Text style={styles.checkOk}>✓</Text>
-                        <Text style={styles.kriteriumText}>
-                          {k.text}
-                          {k.pflicht ? <Text style={styles.stern}> *</Text> : null}
-                        </Text>
-                        <Text style={styles.tag}>Aus Profil</Text>
-                      </View>
-                    )
-                  }
-                  return (
-                    <View
-                      key={k.id}
-                      style={[styles.kriteriumCol, datei ? styles.kriteriumOk : styles.kriteriumWarn]}
-                    >
-                      <Text style={styles.kriteriumText}>
-                        {k.text}
-                        {k.pflicht ? <Text style={styles.stern}> *</Text> : null}
-                      </Text>
-                      {datei ? (
-                        <View style={styles.dateiRow}>
-                          <Text style={styles.dateiName}>✓ {datei.name}</Text>
-                          <Pressable
-                            onPress={() =>
-                              setNachweisDateien((prev) => {
-                                const n = { ...prev }
-                                delete n[k.id]
-                                return n
-                              })
-                            }
-                          >
-                            <Text style={styles.entfernen}>Entfernen</Text>
-                          </Pressable>
-                        </View>
-                      ) : (
-                        <View>
-                          <Pressable style={styles.uploadBtn} onPress={() => nachweisWaehlen(k.id)}>
-                            <Text style={styles.uploadBtnText}>📎 Nachweis hochladen</Text>
-                          </Pressable>
-                          {k.nachweis_typ ? (
-                            <Text style={styles.erwartet}>
-                              Erwartet: {NACHWEIS_TYP_LABELS[k.nachweis_typ] ?? k.nachweis_typ}
-                            </Text>
-                          ) : null}
-                        </View>
-                      )}
-                    </View>
-                  )
-                }
-                const checked = !!eignungsbestaetigung[k.id]
-                return (
-                  <Pressable
-                    key={k.id}
-                    style={[styles.kriterium, checked ? styles.kriteriumOk : styles.kriteriumNeutral]}
-                    onPress={() =>
-                      setEignungsbestaetigung((prev) => ({ ...prev, [k.id]: !prev[k.id] }))
-                    }
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked }}
-                    accessibilityLabel={k.text}
-                  >
-                    <Text style={checked ? styles.checkOk : styles.checkEmpty}>{checked ? '✓' : '○'}</Text>
-                    <Text style={styles.kriteriumText}>
-                      {k.text}
-                      {k.pflicht ? <Text style={styles.stern}> *</Text> : null}
-                    </Text>
-                  </Pressable>
-                )
-              })}
-              <Text style={styles.hint}>* Pflichtnachweis</Text>
-            </View>
-          </View>
-        ) : null}
+        <NachweisSektion
+          kriterien={eignungskriterien}
+          eignungsbestaetigung={eignungsbestaetigung}
+          setEignungsbestaetigung={setEignungsbestaetigung}
+          nachweisProfilMatch={nachweisProfilMatch}
+          nachweisDateien={nachweisDateien}
+          setNachweisDateien={setNachweisDateien}
+        />
 
-        {/* Verpflichtungserklärungen */}
-        {verpflichtungen.length > 0 ? (
-          <View style={styles.field}>
-            <Text style={styles.label}>Verpflichtungserklärungen</Text>
-            <View style={{ gap: 8 }}>
-              {verpflichtungen.map((v, i) => {
-                const checked = !!verpflichtungenBestaetigt[i]
-                return (
-                  <View
-                    key={i}
-                    style={[styles.kriteriumCol, checked ? styles.kriteriumOk : styles.kriteriumNeutral]}
-                  >
-                    <Pressable
-                      style={styles.verpflHead}
-                      onPress={() =>
-                        setVerpflichtungenBestaetigt((prev) =>
-                          prev.map((b, j) => (j === i ? !b : b)),
-                        )
-                      }
-                      accessibilityRole="checkbox"
-                      accessibilityState={{ checked }}
-                      accessibilityLabel={v.titel}
-                    >
-                      <Text style={checked ? styles.checkOk : styles.checkEmpty}>
-                        {checked ? '✓' : '○'}
-                      </Text>
-                      <Text style={[styles.kriteriumText, { flex: 1 }]}>
-                        {v.titel}
-                        <Text style={styles.stern}> *</Text>
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() =>
-                        setVerpflichtungenOffen((prev) => ({ ...prev, [i]: !prev[i] }))
-                      }
-                    >
-                      <Text style={styles.textToggle}>
-                        {verpflichtungenOffen[i] ? 'Text ausblenden' : 'Text anzeigen'}
-                      </Text>
-                    </Pressable>
-                    {verpflichtungenOffen[i] ? <Text style={styles.verpflText}>{v.text}</Text> : null}
-                  </View>
-                )
-              })}
-              <Text style={styles.hint}>* Alle Erklärungen sind verbindlich zu bestätigen.</Text>
-            </View>
-          </View>
-        ) : null}
+        <VerpflichtungenSektion
+          verpflichtungen={verpflichtungen}
+          bestaetigt={verpflichtungenBestaetigt}
+          setBestaetigt={setVerpflichtungenBestaetigt}
+          offen={verpflichtungenOffen}
+          setOffen={setVerpflichtungenOffen}
+        />
 
-        {/* Ausführungszeitraum */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Ausführungszeitraum</Text>
-          <TextInput
-            style={styles.input}
-            value={ausfuehrungszeitraum}
-            onChangeText={setAusfuehrungszeitraum}
-            placeholder="z. B. 01.08. – 15.08.2026"
-            placeholderTextColor={C.muted}
-          />
-        </View>
+        <BasisFelder
+          ausfuehrungszeitraum={ausfuehrungszeitraum}
+          setAusfuehrungszeitraum={setAusfuehrungszeitraum}
+          beschreibung={beschreibung}
+          setBeschreibung={setBeschreibung}
+          referenzen={referenzen}
+          setReferenzen={setReferenzen}
+        />
 
-        {/* Beschreibung */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Kurzbeschreibung Ihres Angebots</Text>
-          <TextInput
-            style={[styles.input, styles.textarea]}
-            value={beschreibung}
-            onChangeText={setBeschreibung}
-            placeholder="Wie gehen Sie die Aufgabe an?"
-            placeholderTextColor={C.muted}
-            multiline
-            numberOfLines={4}
-          />
-        </View>
-
-        {/* Referenzen */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Referenzen (optional)</Text>
-          <TextInput
-            style={[styles.input, styles.textarea]}
-            value={referenzen}
-            onChangeText={setReferenzen}
-            placeholder="Ähnliche Projekte …"
-            placeholderTextColor={C.muted}
-            multiline
-            numberOfLines={3}
-          />
-        </View>
-
-        {/* Anhänge */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Anhänge (optional)</Text>
-          <Pressable style={styles.uploadBtn} onPress={anhangWaehlen}>
-            <Text style={styles.uploadBtnText}>📎 Datei hinzufügen</Text>
-          </Pressable>
-          {anhaenge.length > 0 ? (
-            <View style={{ gap: 4, marginTop: 8 }}>
-              {anhaenge.map((f, i) => (
-                <View key={`${f.name}-${i}`} style={styles.dateiRow}>
-                  <Text style={styles.dateiName}>📄 {f.name}</Text>
-                  <Pressable onPress={() => setAnhaenge((prev) => prev.filter((_, j) => j !== i))}>
-                    <Text style={styles.entfernen}>Entfernen</Text>
-                  </Pressable>
-                </View>
-              ))}
-            </View>
-          ) : null}
-          <Text style={styles.hint}>Erlaubt: PDF, PNG, JPG, DOCX, XLSX · max. 15 MB</Text>
-        </View>
+        <AnhaengeSektion anhaenge={anhaenge} setAnhaenge={setAnhaenge} />
 
         {/* Zusammenfassung + Absenden */}
         <View style={styles.summary}>
@@ -598,72 +413,6 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   bindefristText: { fontSize: 13, color: '#565244', lineHeight: 19 },
-  field: { gap: 8 },
-  label: { fontSize: 12, fontWeight: '600', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.6 },
-  input: {
-    backgroundColor: C.card,
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: C.text,
-  },
-  textarea: { minHeight: 90, textAlignVertical: 'top' },
-  kriterium: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  kriteriumCol: { padding: 12, borderRadius: 8, borderWidth: 1, gap: 8 },
-  kriteriumOk: { borderColor: C.primary, backgroundColor: C.ok },
-  kriteriumWarn: { borderColor: '#c8794166', backgroundColor: C.warn },
-  kriteriumNeutral: { borderColor: C.border, backgroundColor: C.card },
-  kriteriumText: { fontSize: 14, color: C.text, flexShrink: 1 },
-  stern: { color: C.accent },
-  checkOk: { fontSize: 16, color: C.primary, fontWeight: '700' },
-  checkEmpty: { fontSize: 16, color: C.muted },
-  tag: {
-    fontSize: 11,
-    color: C.primary,
-    fontWeight: '600',
-    marginLeft: 'auto',
-    borderWidth: 1,
-    borderColor: '#3a5a3e4d',
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    overflow: 'hidden',
-  },
-  dateiRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  dateiName: { fontSize: 13, color: C.primary, flexShrink: 1 },
-  entfernen: { fontSize: 12, color: C.muted, textDecorationLine: 'underline' },
-  uploadBtn: {
-    backgroundColor: C.card,
-    borderWidth: 1,
-    borderColor: '#c8794166',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-  },
-  uploadBtnText: { fontSize: 13, color: C.accent, fontWeight: '600' },
-  erwartet: { fontSize: 12, color: C.accent, marginTop: 6 },
-  verpflHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  textToggle: { fontSize: 12, color: C.muted, textDecorationLine: 'underline' },
-  verpflText: {
-    fontSize: 13,
-    color: '#3d3d38',
-    lineHeight: 19,
-    borderTopWidth: 1,
-    borderTopColor: C.border,
-    paddingTop: 8,
-  },
-  hint: { fontSize: 12, color: C.muted },
   summary: {
     flexDirection: 'row',
     justifyContent: 'space-between',
