@@ -27,6 +27,79 @@ type AdminAnbieter = {
   verifiziert: boolean
 }
 
+type AdminAuftraggeber = {
+  id: string
+  organisation_name: string
+  ansprechpartner: string | null
+  ort: string | null
+  plz: string | null
+  organisation_typ: string | null
+  verifiziert: boolean
+}
+
+// Einheitliches Karten-Modell: beide Rollen werden beim Laden hierauf
+// normalisiert, damit Liste + Aktionen nur EIN Gerüst brauchen.
+type AdminEintrag = {
+  id: string
+  titel: string
+  zeilen: string[] // gedämpfte Meta-Zeilen (Person, PLZ + Ort)
+  akzent: string // Akzent-Zeile (Gewerke bzw. Organisationstyp)
+  verifiziert: boolean
+}
+
+type Tab = 'anbieter' | 'auftraggeber'
+
+const ORG_TYP_LABELS: Record<string, string> = {
+  kommune: 'Kommune',
+  landkreis: 'Landkreis',
+  behoerde: 'Behörde',
+  schule: 'Schule',
+  sonstiges: 'Sonstiges',
+}
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'anbieter', label: 'Anbieter' },
+  { key: 'auftraggeber', label: 'Auftraggeber' },
+]
+
+// Pro Tab: API-Pfad + Texte + Normalisierung der Server-Antwort.
+const TAB_CONFIG: Record<
+  Tab,
+  {
+    pfad: string
+    einheit: string
+    leerText: string
+    parse: (json: unknown) => AdminEintrag[]
+  }
+> = {
+  anbieter: {
+    pfad: '/api/app-admin/anbieter',
+    einheit: 'Anbieter',
+    leerText: 'Keine Anbieter vorhanden.',
+    parse: (json) =>
+      ((json as { anbieter?: AdminAnbieter[] }).anbieter ?? []).map((a) => ({
+        id: a.id,
+        titel: a.firmenname,
+        zeilen: [a.inhaber_name ?? '', [a.plz, a.ort].filter(Boolean).join(' ')].filter(Boolean),
+        akzent: (a.gewerke ?? []).map((g) => GEWERK_LABELS[g] ?? g).join(', '),
+        verifiziert: a.verifiziert,
+      })),
+  },
+  auftraggeber: {
+    pfad: '/api/app-admin/auftraggeber',
+    einheit: 'Auftraggeber',
+    leerText: 'Keine Auftraggeber vorhanden.',
+    parse: (json) =>
+      ((json as { auftraggeber?: AdminAuftraggeber[] }).auftraggeber ?? []).map((a) => ({
+        id: a.id,
+        titel: a.organisation_name,
+        zeilen: [a.ansprechpartner ?? '', [a.plz, a.ort].filter(Boolean).join(' ')].filter(Boolean),
+        akzent: a.organisation_typ ? (ORG_TYP_LABELS[a.organisation_typ] ?? a.organisation_typ) : '',
+        verifiziert: a.verifiziert,
+      })),
+  },
+}
+
 type Phase = 'checking' | 'mfa' | 'ready' | 'error'
 
 async function authedFetch(path: string, init?: RequestInit) {
@@ -46,14 +119,19 @@ export default function AdminScreen() {
   const [code, setCode] = useState('')
   const [pruefe, setPruefe] = useState(false)
 
-  const [anbieter, setAnbieter] = useState<AdminAnbieter[]>([])
+  const [tab, setTab] = useState<Tab>('anbieter')
+  // null = für diesen Tab noch nie geladen (Lazy-Load beim ersten Öffnen)
+  const [eintraege, setEintraege] = useState<Record<Tab, AdminEintrag[] | null>>({
+    anbieter: null,
+    auftraggeber: null,
+  })
   const [ladenListe, setLadenListe] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
 
-  const ladeListe = useCallback(async () => {
+  const ladeListe = useCallback(async (t: Tab) => {
     setLadenListe(true)
     try {
-      const res = await authedFetch('/api/app-admin/anbieter')
+      const res = await authedFetch(TAB_CONFIG[t].pfad)
       if (!res.ok) {
         const j = await res.json().catch(() => ({}))
         if ((j as { error?: string }).error === 'mfa_required') {
@@ -64,8 +142,8 @@ export default function AdminScreen() {
         setPhase('error')
         return
       }
-      const j = (await res.json()) as { anbieter: AdminAnbieter[] }
-      setAnbieter(j.anbieter ?? [])
+      const j = (await res.json()) as unknown
+      setEintraege((prev) => ({ ...prev, [t]: TAB_CONFIG[t].parse(j) }))
       setPhase('ready')
     } catch {
       setFehler('Netzwerkfehler — Endpoint evtl. noch nicht deployed.')
@@ -85,7 +163,7 @@ export default function AdminScreen() {
         return
       }
       if (data.currentLevel === 'aal2') {
-        ladeListe()
+        ladeListe('anbieter')
         return
       }
       // Faktor ermitteln und Code-Schritt zeigen
@@ -122,19 +200,25 @@ export default function AdminScreen() {
       }
       // Session ist jetzt aal2 → Liste laden
       setCode('')
-      await ladeListe()
+      await ladeListe(tab)
     } finally {
       setPruefe(false)
     }
   }
 
-  async function setVerifiziert(a: AdminAnbieter, verifizieren: boolean) {
-    setBusyId(a.id)
+  function wechsleTab(t: Tab) {
+    if (t === tab) return
+    setTab(t)
+    if (eintraege[t] === null) ladeListe(t)
+  }
+
+  async function setVerifiziert(t: Tab, e: AdminEintrag, verifizieren: boolean) {
+    setBusyId(e.id)
     try {
-      const res = await authedFetch('/api/app-admin/anbieter', {
+      const res = await authedFetch(TAB_CONFIG[t].pfad, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: a.id, verifizieren }),
+        body: JSON.stringify({ id: e.id, verifizieren }),
       })
       if (!res.ok) {
         const j = await res.json().catch(() => ({}))
@@ -142,7 +226,10 @@ export default function AdminScreen() {
         return
       }
       // Lokal aktualisieren
-      setAnbieter((prev) => prev.map((x) => (x.id === a.id ? { ...x, verifiziert: verifizieren } : x)))
+      setEintraege((prev) => ({
+        ...prev,
+        [t]: (prev[t] ?? []).map((x) => (x.id === e.id ? { ...x, verifiziert: verifizieren } : x)),
+      }))
     } catch {
       Alert.alert('Netzwerkfehler', 'Aktion konnte nicht gesendet werden.')
     } finally {
@@ -208,30 +295,44 @@ export default function AdminScreen() {
   }
 
   // phase === 'ready'
-  const offen = anbieter.filter((a) => !a.verifiziert).length
+  const konfig = TAB_CONFIG[tab]
+  const liste = eintraege[tab] ?? []
+  const offen = liste.filter((e) => !e.verifiziert).length
   return (
     <View style={styles.container}>
+      <View style={styles.segment}>
+        {TABS.map((t) => {
+          const aktiv = tab === t.key
+          return (
+            <Pressable
+              key={t.key}
+              style={[styles.segmentBtn, aktiv && styles.segmentBtnAktiv]}
+              onPress={() => wechsleTab(t.key)}
+            >
+              <Text style={[styles.segmentText, aktiv && styles.segmentTextAktiv]}>{t.label}</Text>
+            </Pressable>
+          )
+        })}
+      </View>
       <FlatList
-        data={anbieter}
+        data={liste}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         refreshing={ladenListe}
-        onRefresh={ladeListe}
+        onRefresh={() => ladeListe(tab)}
         ListHeaderComponent={
           <Text style={styles.summary}>
-            {anbieter.length} Anbieter · {offen} offen
+            {liste.length} {konfig.einheit} · {offen} offen
           </Text>
         }
         ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
         renderItem={({ item }) => {
-          const gewerke = (item.gewerke ?? []).map((g) => GEWERK_LABELS[g] ?? g).join(', ')
-          const ort = [item.plz, item.ort].filter(Boolean).join(' ')
           const busy = busyId === item.id
           return (
             <View style={styles.cardItem}>
               <View style={styles.cardHead}>
-                <Text style={styles.firmenname} numberOfLines={2}>
-                  {item.firmenname}
+                <Text style={styles.titel} numberOfLines={2}>
+                  {item.titel}
                 </Text>
                 {item.verifiziert ? (
                   <View style={[styles.badge, styles.badgeOk]}>
@@ -243,16 +344,19 @@ export default function AdminScreen() {
                   </View>
                 )}
               </View>
-              {item.inhaber_name ? <Text style={styles.meta}>{item.inhaber_name}</Text> : null}
-              {ort ? <Text style={styles.meta}>{ort}</Text> : null}
-              {gewerke ? <Text style={styles.metaGewerk}>{gewerke}</Text> : null}
+              {item.zeilen.map((zeile, i) => (
+                <Text key={i} style={styles.meta}>
+                  {zeile}
+                </Text>
+              ))}
+              {item.akzent ? <Text style={styles.metaAkzent}>{item.akzent}</Text> : null}
 
               <View style={styles.aktionRow}>
                 {item.verifiziert ? (
                   <Pressable
                     style={[styles.sperrBtn, busy && styles.btnDisabled]}
                     disabled={busy}
-                    onPress={() => setVerifiziert(item, false)}
+                    onPress={() => setVerifiziert(tab, item, false)}
                   >
                     <Text style={styles.sperrBtnText}>{busy ? '…' : 'Verifizierung entziehen'}</Text>
                   </Pressable>
@@ -260,7 +364,7 @@ export default function AdminScreen() {
                   <Pressable
                     style={[styles.verifyBtn, busy && styles.btnDisabled]}
                     disabled={busy}
-                    onPress={() => setVerifiziert(item, true)}
+                    onPress={() => setVerifiziert(tab, item, true)}
                   >
                     <Text style={styles.verifyBtnText}>{busy ? '…' : '✓ Verifizieren'}</Text>
                   </Pressable>
@@ -271,7 +375,7 @@ export default function AdminScreen() {
         }}
         ListEmptyComponent={
           <View style={{ paddingTop: 64, alignItems: 'center' }}>
-            <Text style={styles.muted}>Keine Anbieter vorhanden.</Text>
+            <Text style={styles.muted}>{ladenListe ? 'Wird geladen …' : konfig.leerText}</Text>
           </View>
         }
       />
@@ -311,6 +415,21 @@ const styles = StyleSheet.create({
   },
   primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   btnDisabled: { opacity: 0.5 },
+  segment: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginTop: 16,
+    backgroundColor: C.card,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 10,
+    padding: 4,
+    gap: 4,
+  },
+  segmentBtn: { flex: 1, paddingVertical: 8, borderRadius: 7, alignItems: 'center' },
+  segmentBtnAktiv: { backgroundColor: C.primary },
+  segmentText: { fontSize: 14, fontWeight: '600', color: C.muted },
+  segmentTextAktiv: { color: '#fff' },
   list: { padding: 16 },
   summary: { fontSize: 12, color: C.muted, marginBottom: 12 },
   cardItem: {
@@ -322,14 +441,14 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
-  firmenname: { fontSize: 16, fontWeight: '600', color: C.text, flex: 1 },
+  titel: { fontSize: 16, fontWeight: '600', color: C.text, flex: 1 },
   badge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   badgeOk: { backgroundColor: C.ok },
   badgeOkText: { fontSize: 11, fontWeight: '700', color: C.primary },
   badgeWarn: { backgroundColor: '#fdf3ea' },
   badgeWarnText: { fontSize: 11, fontWeight: '700', color: C.accent },
   meta: { fontSize: 13, color: C.muted },
-  metaGewerk: { fontSize: 13, color: C.accent, fontWeight: '500' },
+  metaAkzent: { fontSize: 13, color: C.accent, fontWeight: '500' },
   aktionRow: { marginTop: 10, flexDirection: 'row' },
   verifyBtn: { flex: 1, backgroundColor: C.primary, borderRadius: 8, paddingVertical: 11, alignItems: 'center' },
   verifyBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
