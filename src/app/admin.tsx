@@ -33,10 +33,13 @@ type AdminAuftraggeber = {
   id: string
   organisation_name: string
   ansprechpartner: string | null
+  strasse: string | null
+  hausnummer: string | null
   ort: string | null
   plz: string | null
   organisation_typ: string | null
   verifiziert: boolean
+  email: string | null
 }
 
 const ORG_TYP_LABELS: Record<string, string> = {
@@ -83,8 +86,19 @@ const TAB_CONFIG: Record<
       ((json as { auftraggeber?: AdminAuftraggeber[] }).auftraggeber ?? []).map((a) => ({
         id: a.id,
         titel: a.organisation_name,
-        zeilen: [a.ansprechpartner ?? '', [a.plz, a.ort].filter(Boolean).join(' ')].filter(Boolean),
-        akzent: a.organisation_typ ? (ORG_TYP_LABELS[a.organisation_typ] ?? a.organisation_typ) : '',
+        zeilen: [
+          a.ansprechpartner ?? '',
+          a.organisation_typ ? (ORG_TYP_LABELS[a.organisation_typ] ?? a.organisation_typ) : '',
+          // Adresse wie im Web-Admin: „Straße Hausnummer, PLZ Ort" (Straße nur wenn vorhanden)
+          [
+            [a.strasse, a.hausnummer].filter(Boolean).join(' '),
+            [a.plz, a.ort].filter(Boolean).join(' '),
+          ]
+            .filter(Boolean)
+            .join(', '),
+          a.email ?? '',
+        ].filter(Boolean),
+        akzent: '',
         verifiziert: a.verifiziert,
       })),
   },
