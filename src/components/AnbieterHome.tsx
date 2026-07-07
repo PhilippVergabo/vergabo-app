@@ -13,7 +13,6 @@ import {
 import { useRouter, useFocusEffect, type Href } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
-import { abmeldenMitBestaetigung } from '@/lib/auth'
 import { AuftragKarte, type AuftragItem } from '@/components/AuftragKarte'
 import { addPushTapListener, registriereFuerPush } from '@/lib/push'
 import { gewerkLabel } from '@/lib/labels'
@@ -158,7 +157,7 @@ export function AnbieterHome() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Ausschreibungen</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>Ausschreibungen</Text>
         <View style={styles.headerAktionen}>
           <Pressable
             onPress={() => router.push('/eigenerklarungen')}
@@ -187,9 +186,8 @@ export function AnbieterHome() {
           >
             <Text style={styles.headerIcon}>{'⚙️'}</Text>
           </Pressable>
-          <Pressable onPress={abmeldenMitBestaetigung} hitSlop={8} accessibilityRole="button">
-            <Text style={styles.logout}>Abmelden</Text>
-          </Pressable>
+          {/* "Abmelden" bewusst nicht mehr im Header (zu eng, lief rechts aus
+              dem Bild) — es liegt im ⚙️-Einstellungen-Screen. */}
         </View>
       </View>
 
@@ -307,8 +305,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: C.border,
   },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: C.text },
-  headerAktionen: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  headerTitle: { fontSize: 20, fontWeight: '700', color: C.text, flexShrink: 1, marginRight: 12 },
+  headerAktionen: { flexDirection: 'row', alignItems: 'center', gap: 18, flexShrink: 0 },
   headerLink: { fontSize: 14, color: C.primary, fontWeight: '600' },
   headerIcon: { fontSize: 16 },
   badgePunkt: {
@@ -322,7 +320,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: C.bg,
   },
-  logout: { fontSize: 14, color: C.muted },
   filterBar: {
     paddingTop: 12,
     paddingBottom: 8,
