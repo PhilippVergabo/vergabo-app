@@ -83,6 +83,14 @@ export default function LoginScreen() {
           <Text style={styles.buttonText}>{loading ? 'Anmelden …' : 'Anmelden'}</Text>
         </Pressable>
 
+        <Pressable
+          onPress={() => router.push('/passwort-vergessen')}
+          hitSlop={8}
+          style={styles.forgotRow}
+        >
+          <Text style={styles.forgotLink}>Passwort vergessen?</Text>
+        </Pressable>
+
         <View style={styles.registerRow}>
           <Text style={styles.hint}>Noch kein Konto?</Text>
           <Pressable onPress={() => router.push('/registrieren-auswahl')} hitSlop={8}>
@@ -156,6 +164,15 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  forgotRow: {
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  forgotLink: {
+    fontSize: 13,
+    color: C.muted,
+    textDecorationLine: 'underline',
   },
   hint: {
     fontSize: 13,

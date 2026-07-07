@@ -40,6 +40,8 @@ export function AnbieterHome() {
   const [auftraege, setAuftraege] = useState<AuftragItem[]>([])
   // auftrag_id → eigener Angebotspreis (netto); Schlüssel-Existenz = beworben
   const [meineAngebote, setMeineAngebote] = useState<Map<string, number | null>>(new Map())
+  // Aufträge, zu denen der Anbieter eingeladen wurde (RLS liefert nur eigene Einladungen)
+  const [einladungen, setEinladungen] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -57,7 +59,7 @@ export function AnbieterHome() {
 
   const gefilterteAuftraege = useMemo(() => {
     const q = suche.trim().toLowerCase()
-    return auftraege.filter((a) => {
+    const gefiltert = auftraege.filter((a) => {
       if (gewerkFilter && a.gewerk !== gewerkFilter) return false
       if (!q) return true
       const heuhaufen = [a.titel, a.ausfuehrungsort_ort, a.ausfuehrungsort_plz, gewerkLabel(a.gewerk)]
@@ -66,24 +68,31 @@ export function AnbieterHome() {
         .toLowerCase()
       return heuhaufen.includes(q)
     })
-  }, [auftraege, suche, gewerkFilter])
+    // Eingeladene Aufträge nach oben; innerhalb der Gruppen bleibt die
+    // Lade-Reihenfolge (neueste zuerst) erhalten — sort() ist stabil.
+    return gefiltert.sort((a, b) => Number(einladungen.has(b.id)) - Number(einladungen.has(a.id)))
+  }, [auftraege, suche, gewerkFilter, einladungen])
 
   const loadData = useCallback(async () => {
     const [
       { data: auftraegeData, error: auftraegeError },
       { data: bewerbungenData },
+      { data: einladungenData },
       { data: profilData },
     ] = await Promise.all([
+      // Alle Verfahren laden — RLS regelt die Sichtbarkeit (beschränkte
+      // Ausschreibungen sieht der Anbieter nur, wenn er eingeladen ist).
       supabase
         .from('auftraege')
         .select(
-          'id, titel, gewerk, ausfuehrungsort_plz, ausfuehrungsort_ort, frist:angebotsfrist, budget_max:budget_bis, created_at:erstellt_am',
+          'id, titel, gewerk, vergabeverfahren, ausfuehrungsort_plz, ausfuehrungsort_ort, frist:angebotsfrist, budget_max:budget_bis, created_at:erstellt_am',
         )
         .eq('status', 'veroeffentlicht')
-        .eq('vergabeverfahren', 'direktauftrag')
         .order('erstellt_am', { ascending: false }),
       // RLS liefert dem Anbieter nur die EIGENEN Bewerbungen
       supabase.from('bewerbungen').select('auftrag_id, angebotspreis_netto'),
+      // RLS liefert nur die EIGENEN Einladungen
+      supabase.from('einladungen').select('auftrag_id'),
       // Own-Row-RLS: liefert nur das eigene Profil (für den Verifizierungs-Hinweis)
       supabase.from('anbieter_profile').select('verifiziert').maybeSingle(),
     ])
@@ -99,6 +108,7 @@ export function AnbieterHome() {
       angebote.set(b.auftrag_id, b.angebotspreis_netto ?? null)
     }
     setMeineAngebote(angebote)
+    setEinladungen(new Set((einladungenData ?? []).map((e) => e.auftrag_id)))
     setVerifiziert(profilData?.verifiziert ?? null)
   }, [])
 
@@ -148,6 +158,14 @@ export function AnbieterHome() {
             accessibilityLabel="Nachweise und Erklärungen verwalten"
           >
             <Text style={styles.headerLink}>Nachweise</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/einstellungen' as Href)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Einstellungen"
+          >
+            <Text style={styles.headerIcon}>{'⚙️'}</Text>
           </Pressable>
           <Pressable onPress={abmeldenMitBestaetigung} hitSlop={8} accessibilityRole="button">
             <Text style={styles.logout}>Abmelden</Text>
@@ -222,6 +240,7 @@ export function AnbieterHome() {
           <AuftragKarte
             auftrag={item}
             beworben={meineAngebote.has(item.id)}
+            eingeladen={einladungen.has(item.id)}
             angebotPreis={meineAngebote.get(item.id) ?? null}
             onPress={() => router.push(`/auftraege/${item.id}`)}
           />
@@ -271,6 +290,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 20, fontWeight: '700', color: C.text },
   headerAktionen: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   headerLink: { fontSize: 14, color: C.primary, fontWeight: '600' },
+  headerIcon: { fontSize: 16 },
   logout: { fontSize: 14, color: C.muted },
   filterBar: {
     paddingTop: 12,

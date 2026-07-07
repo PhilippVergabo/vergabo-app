@@ -1,13 +1,14 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { budgetRange } from '@/lib/budgetRange'
 import { fmtPreis } from '@/lib/bewerbung'
-import { gewerkLabel } from '@/lib/labels'
+import { gewerkLabel, verfahrenLabel } from '@/lib/labels'
 import { C } from '@/lib/theme'
 
 export type AuftragItem = {
   id: string
   titel: string
   gewerk: string | null
+  vergabeverfahren: string | null
   ausfuehrungsort_plz: string | null
   ausfuehrungsort_ort: string | null
   frist: string | null
@@ -18,6 +19,7 @@ export type AuftragItem = {
 type Props = {
   auftrag: AuftragItem
   beworben: boolean
+  eingeladen?: boolean
   angebotPreis?: number | null
   onPress: () => void
 }
@@ -37,16 +39,19 @@ function formatBudget(max: number | null) {
   return budgetRange(max)
 }
 
-export function AuftragKarte({ auftrag, beworben, angebotPreis, onPress }: Props) {
+export function AuftragKarte({ auftrag, beworben, eingeladen, angebotPreis, onPress }: Props) {
   const budget = formatBudget(auftrag.budget_max)
   const frist = formatDate(auftrag.frist)
   const ort = [auftrag.ausfuehrungsort_plz, auftrag.ausfuehrungsort_ort].filter(Boolean).join(' ')
+  const verfahren = verfahrenLabel(auftrag.vergabeverfahren)
 
   // Karteninhalt zu einer Vorlese-Beschriftung zusammenfassen (Screenreader liest
   // die Karte als eine Einheit statt als lose Einzeltexte).
   const a11yLabel = [
     `Ausschreibung: ${auftrag.titel}`,
+    eingeladen ? 'Sie sind eingeladen' : null,
     auftrag.gewerk ? gewerkLabel(auftrag.gewerk) : null,
+    verfahren || null,
     ort ? `Ort ${ort}` : null,
     frist ? `Frist ${frist}` : null,
     budget ? `Budget ${budget}` : null,
@@ -63,6 +68,12 @@ export function AuftragKarte({ auftrag, beworben, angebotPreis, onPress }: Props
       accessibilityLabel={a11yLabel}
       accessibilityHint="Öffnet die Details der Ausschreibung"
     >
+      {eingeladen && (
+        <View style={styles.einladungBadge}>
+          <Text style={styles.einladungBadgeText}>{'\u{1F4E9}'} Sie sind eingeladen</Text>
+        </View>
+      )}
+
       <View style={styles.titleRow}>
         <Text style={styles.titel} numberOfLines={2}>
           {auftrag.titel}
@@ -74,7 +85,12 @@ export function AuftragKarte({ auftrag, beworben, angebotPreis, onPress }: Props
         )}
       </View>
 
-      {auftrag.gewerk ? <Text style={styles.gewerk}>{gewerkLabel(auftrag.gewerk)}</Text> : null}
+      {auftrag.gewerk || verfahren ? (
+        <View style={styles.tagRow}>
+          {auftrag.gewerk ? <Text style={styles.gewerk}>{gewerkLabel(auftrag.gewerk)}</Text> : null}
+          {verfahren ? <Text style={styles.verfahren}>{verfahren}</Text> : null}
+        </View>
+      ) : null}
 
       <View style={styles.meta}>
         {ort ? <Text style={styles.metaText}>{'\u{1F4CD}'} {ort}</Text> : null}
@@ -127,10 +143,32 @@ const styles = StyleSheet.create({
     color: C.primary,
     fontWeight: '600',
   },
+  einladungBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: C.accent,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  einladungBadgeText: {
+    fontSize: 12,
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+  tagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
   gewerk: {
     fontSize: 13,
     color: C.accent,
     fontWeight: '500',
+  },
+  verfahren: {
+    fontSize: 12,
+    color: C.muted,
   },
   meta: {
     gap: 4,

@@ -18,6 +18,19 @@ export function gewerkLabel(gewerk: string | null | undefined): string {
   return GEWERK_LABELS[gewerk] ?? gewerk
 }
 
+// Vergabeverfahren → Anzeige-Label (dezente Zusatzinfo in Karten/Detail).
+export const VERFAHREN_LABELS: Record<string, string> = {
+  direktauftrag: 'Direktauftrag',
+  direktvergabe_3: 'Direktvergabe',
+  beschraenkte_ausschreibung: 'Beschränkte Ausschreibung',
+}
+
+// Schlüssel → Label; unbekannte Werte werden unverändert zurückgegeben.
+export function verfahrenLabel(verfahren: string | null | undefined): string {
+  if (!verfahren) return ''
+  return VERFAHREN_LABELS[verfahren] ?? verfahren
+}
+
 // Auftragsstatus → Anzeige-Label + Badge-Farben (Hintergrund, Text).
 // Vorher lokal in AuftraggeberHome definiert.
 export type AuftragStatusStil = { label: string; bg: string; fg: string }

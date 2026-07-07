@@ -1,8 +1,11 @@
 import { useCallback, useState } from 'react'
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { supabase } from '@/lib/supabase'
+import { authedFetch } from '@/lib/authedFetch'
 import { budgetRange } from '@/lib/budgetRange'
+import { dateiWaehlen, type PickedFile } from '@/lib/bewerbung'
+import { sanitizeDateiname } from '@/lib/eigenerklarungTypen'
 import { gewerkLabel } from '@/lib/labels'
 import { Rueckfragen } from '@/components/Rueckfragen'
 import { C } from '@/lib/theme'
@@ -16,6 +19,16 @@ type AuftragDetail = {
   ausfuehrungsort_ort: string | null
   frist: string | null
   budget_max: number | null
+  status: string
+}
+
+// Spiegel der GET-/PATCH-Antwort von /api/nachforderung (Web-Plattform).
+type Nachforderung = {
+  id: string
+  bewerbung_id: string
+  auftrag_id: string
+  beschreibung: string
+  frist: string
   status: string
 }
 
@@ -43,35 +56,162 @@ export default function AuftragDetailScreen() {
   const [auftrag, setAuftrag] = useState<AuftragDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [meineBewerbung, setMeineBewerbung] = useState<{ id: string; status: string } | null>(null)
+  const [nachforderungen, setNachforderungen] = useState<Nachforderung[]>([])
+  const [nfDateien, setNfDateien] = useState<Record<string, PickedFile[]>>({})
+  const [nfBusy, setNfBusy] = useState<string | null>(null)
+  const [nachgereicht, setNachgereicht] = useState<Record<string, boolean>>({})
+  const [zieheZurueck, setZieheZurueck] = useState(false)
+
+  const laden = useCallback(async () => {
+    if (!id) return
+    const [{ data: a }, { data: b }] = await Promise.all([
+      supabase
+        .from('auftraege')
+        .select(
+          'id, titel, beschreibung, gewerk, ausfuehrungsort_plz, ausfuehrungsort_ort, frist:angebotsfrist, budget_max:budget_bis, status',
+        )
+        .eq('id', id)
+        .single(),
+      // Zurückgezogene Angebote zählen nicht als "bereits beworben" — nach dem
+      // Zurückziehen erscheint wieder der "Angebot abgeben"-CTA.
+      supabase
+        .from('bewerbungen')
+        .select('id, status')
+        .eq('auftrag_id', id)
+        .neq('status', 'zurueckgezogen')
+        .limit(1),
+    ])
+    setAuftrag(a as AuftragDetail | null)
+    const meine = (b ?? [])[0] as { id: string; status: string } | undefined
+    setMeineBewerbung(meine ?? null)
+
+    // Offene Nachforderungen zur eigenen Bewerbung (Bearer-API der Web-Plattform).
+    if (meine) {
+      try {
+        const res = await authedFetch(`/api/nachforderung?bewerbung_ids=${meine.id}`)
+        if (res.ok) {
+          const liste = (await res.json()) as Nachforderung[]
+          setNachforderungen(Array.isArray(liste) ? liste : [])
+        }
+      } catch {
+        // Nicht-fatal: Detailansicht funktioniert auch ohne Nachforderungs-Info.
+      }
+    } else {
+      setNachforderungen([])
+    }
+    setLoading(false)
+  }, [id])
 
   // Bei jedem Fokus neu laden — so erscheint nach dem Einreichen sofort der
   // "bereits beworben"-Status.
   useFocusEffect(
     useCallback(() => {
-      let aktiv = true
-      if (!id) return
-      ;(async () => {
-        const [{ data: a }, { data: b }] = await Promise.all([
-          supabase
-            .from('auftraege')
-            .select(
-              'id, titel, beschreibung, gewerk, ausfuehrungsort_plz, ausfuehrungsort_ort, frist:angebotsfrist, budget_max:budget_bis, status',
-            )
-            .eq('id', id)
-            .single(),
-          supabase.from('bewerbungen').select('id, status').eq('auftrag_id', id).limit(1),
-        ])
-        if (!aktiv) return
-        setAuftrag(a as AuftragDetail | null)
-        const meine = (b ?? [])[0] as { id: string; status: string } | undefined
-        setMeineBewerbung(meine ?? null)
-        setLoading(false)
-      })()
-      return () => {
-        aktiv = false
-      }
-    }, [id]),
+      void laden()
+    }, [laden]),
   )
+
+  // ── Nachforderung: Datei zur Auswahl hinzufügen ────────────────────────────
+  async function nfDateiHinzufuegen(nfId: string) {
+    const file = await dateiWaehlen()
+    if (!file) return
+    setNfDateien((prev) => {
+      const vorhanden = prev[nfId] ?? []
+      // Doppelte Namen ersetzen (Upload nutzt upsert, letzter gewinnt)
+      return { ...prev, [nfId]: [...vorhanden.filter((f) => f.name !== file.name), file] }
+    })
+  }
+
+  function nfDateiEntfernen(nfId: string, name: string) {
+    setNfDateien((prev) => ({ ...prev, [nfId]: (prev[nfId] ?? []).filter((f) => f.name !== name) }))
+  }
+
+  // ── Nachforderung: Upload + Erfüllt-Meldung (Spiegel Web NachforderungBanner) ──
+  // Pfad + Verifikation exakt wie der Web-Anbieter: Upload nach
+  // bewerbung-anhaenge/{bewerbung_id}/nachforderung/{name}, danach serverseitige
+  // Magic-Byte-Verifikation, erst dann PATCH /api/nachforderung.
+  async function nachreichen(nf: Nachforderung) {
+    const dateien = nfDateien[nf.id] ?? []
+    if (dateien.length === 0 || nfBusy) return
+    setNfBusy(nf.id)
+    try {
+      const hochgeladeneNamen: string[] = []
+      for (const file of dateien) {
+        const sicherName = sanitizeDateiname(file.name)
+        const pfad = `${nf.bewerbung_id}/nachforderung/${sicherName}`
+        const bytes = await (await fetch(file.uri)).arrayBuffer()
+        const { error } = await supabase.storage
+          .from('bewerbung-anhaenge')
+          .upload(pfad, bytes, {
+            upsert: true,
+            contentType: file.mimeType ?? 'application/octet-stream',
+          })
+        if (error) {
+          Alert.alert('Upload fehlgeschlagen', `${file.name}: ${error.message}`)
+          return
+        }
+        const ver = await authedFetch('/api/datei-verifizieren', {
+          method: 'POST',
+          body: JSON.stringify({ bucket: 'bewerbung-anhaenge', pfad }),
+        })
+        if (!ver.ok) {
+          const j = (await ver.json().catch(() => ({}))) as { error?: string }
+          Alert.alert('Datei abgelehnt', j.error ?? `${file.name} hat die Prüfung nicht bestanden.`)
+          return
+        }
+        hochgeladeneNamen.push(sicherName)
+      }
+
+      const res = await authedFetch('/api/nachforderung', {
+        method: 'PATCH',
+        body: JSON.stringify({ nachforderung_id: nf.id, dateinamen: hochgeladeneNamen }),
+      })
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string }
+        Alert.alert('Fehler', j.error ?? 'Die Unterlagen konnten nicht bestätigt werden.')
+        return
+      }
+      setNachgereicht((prev) => ({ ...prev, [nf.id]: true }))
+      setNfDateien((prev) => ({ ...prev, [nf.id]: [] }))
+      await laden()
+    } catch (e) {
+      Alert.alert('Verbindungsfehler', e instanceof Error ? e.message : String(e))
+    } finally {
+      setNfBusy(null)
+    }
+  }
+
+  // ── Angebot zurückziehen ───────────────────────────────────────────────────
+  function zurueckziehenBestaetigen() {
+    Alert.alert(
+      'Angebot zurückziehen',
+      'Möchten Sie Ihr Angebot wirklich zurückziehen? Dieser Schritt kann nicht rückgängig gemacht werden.',
+      [
+        { text: 'Abbrechen', style: 'cancel' },
+        { text: 'Zurückziehen', style: 'destructive', onPress: () => void zurueckziehen() },
+      ],
+    )
+  }
+
+  async function zurueckziehen() {
+    if (!auftrag || !meineBewerbung || zieheZurueck) return
+    setZieheZurueck(true)
+    try {
+      const res = await authedFetch('/api/bewerbung-zurueckziehen', {
+        method: 'POST',
+        body: JSON.stringify({ bewerbung_id: meineBewerbung.id, auftrag_id: auftrag.id }),
+      })
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string }
+        Alert.alert('Zurückziehen fehlgeschlagen', j.error ?? 'Bitte versuchen Sie es später erneut.')
+        return
+      }
+      await laden()
+    } catch (e) {
+      Alert.alert('Verbindungsfehler', e instanceof Error ? e.message : String(e))
+    } finally {
+      setZieheZurueck(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -96,6 +236,10 @@ export default function AuftragDetailScreen() {
   // abgelaufen ist (konsistent zum Bearbeiten-Flow).
   const fristAbgelaufen = auftrag.frist ? new Date() >= new Date(auftrag.frist) : false
   const aktiv = auftrag.status === 'veroeffentlicht' && !fristAbgelaufen
+  // Offene Nachforderungen mit noch laufender Frist (Spiegel Web-Banner).
+  const offeneNachforderungen = nachforderungen.filter(
+    (nf) => nf.status === 'offen' && new Date(nf.frist) >= new Date(),
+  )
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -115,6 +259,87 @@ export default function AuftragDetailScreen() {
         </View>
       ) : null}
 
+      {/* Bestätigung nach erfolgreichem Nachreichen (Nachforderung ist danach
+          nicht mehr "offen" und verschwindet aus der Liste). */}
+      {Object.keys(nachgereicht).length > 0 && meineBewerbung ? (
+        <View style={styles.nachgereichtBanner}>
+          <Text style={styles.nachgereichtText}>Nachgereicht ✓</Text>
+          <Text style={styles.nachgereichtHinweis}>
+            Ihre Unterlagen wurden übermittelt. Der Auftraggeber wurde benachrichtigt.
+          </Text>
+        </View>
+      ) : null}
+
+      {/* Offene Nachforderungen des Auftraggebers zur eigenen Bewerbung */}
+      {offeneNachforderungen.map((nf) => {
+        const verbleibendeTage = Math.ceil(
+          (new Date(nf.frist).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+        )
+        const dringend = verbleibendeTage <= 2
+        const dateien = nfDateien[nf.id] ?? []
+        const busy = nfBusy === nf.id
+        return (
+          <View key={nf.id} style={[styles.nfBanner, dringend && styles.nfBannerDringend]}>
+            <Text style={[styles.nfTitel, dringend && styles.nfTitelDringend]}>
+              ⚠️ Unterlagen angefordert
+              {dringend && verbleibendeTage > 0
+                ? verbleibendeTage === 1
+                  ? ' — Noch 1 Tag!'
+                  : ` — Noch ${verbleibendeTage} Tage!`
+                : ''}
+            </Text>
+            <Text style={styles.nfBeschreibung}>{nf.beschreibung}</Text>
+            <Text style={[styles.nfFrist, dringend && styles.nfTitelDringend]}>
+              Frist: {formatDate(nf.frist)}
+            </Text>
+
+            {dateien.map((f) => (
+              <View key={f.name} style={styles.nfDateiZeile}>
+                <Text style={styles.nfDateiName} numberOfLines={1}>
+                  📎 {f.name}
+                </Text>
+                <Pressable
+                  onPress={() => nfDateiEntfernen(nf.id, f.name)}
+                  disabled={busy}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${f.name} entfernen`}
+                  hitSlop={8}
+                >
+                  <Text style={styles.nfDateiEntfernen}>✕</Text>
+                </Pressable>
+              </View>
+            ))}
+
+            <View style={styles.nfAktionen}>
+              <Pressable
+                style={[styles.nfWaehlenBtn, busy && styles.btnDisabled]}
+                onPress={() => void nfDateiHinzufuegen(nf.id)}
+                disabled={busy}
+                accessibilityRole="button"
+              >
+                <Text style={styles.nfWaehlenBtnText}>📎 Datei wählen</Text>
+              </Pressable>
+              {dateien.length > 0 ? (
+                <Pressable
+                  style={[styles.nfSendenBtn, busy && styles.btnDisabled]}
+                  onPress={() => void nachreichen(nf)}
+                  disabled={busy}
+                  accessibilityRole="button"
+                >
+                  {busy ? (
+                    <ActivityIndicator color="#ffffff" size="small" />
+                  ) : (
+                    <Text style={styles.nfSendenBtnText}>
+                      {dateien.length === 1 ? 'Datei nachreichen' : `${dateien.length} Dateien nachreichen`}
+                    </Text>
+                  )}
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+        )
+      })}
+
       <View style={styles.ctaBlock}>
         {meineBewerbung ? (
           <View style={{ gap: 12 }}>
@@ -122,13 +347,27 @@ export default function AuftragDetailScreen() {
               <Text style={styles.beworbenText}>Sie haben bereits ein Angebot abgegeben.</Text>
             </View>
             {aktiv && ['eingereicht', 'in_pruefung'].includes(meineBewerbung.status) ? (
-              <Pressable
-                style={styles.ctaButton}
-                onPress={() => router.push(`/auftraege/${auftrag.id}/bearbeiten`)}
-                accessibilityRole="button"
-              >
-                <Text style={styles.ctaButtonText}>Angebot bearbeiten</Text>
-              </Pressable>
+              <>
+                <Pressable
+                  style={styles.ctaButton}
+                  onPress={() => router.push(`/auftraege/${auftrag.id}/bearbeiten`)}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.ctaButtonText}>Angebot bearbeiten</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.zurueckziehenButton, zieheZurueck && styles.btnDisabled]}
+                  onPress={zurueckziehenBestaetigen}
+                  disabled={zieheZurueck}
+                  accessibilityRole="button"
+                >
+                  {zieheZurueck ? (
+                    <ActivityIndicator color="#7a3320" size="small" />
+                  ) : (
+                    <Text style={styles.zurueckziehenButtonText}>Angebot zurückziehen</Text>
+                  )}
+                </Pressable>
+              </>
             ) : null}
           </View>
         ) : aktiv ? (
@@ -253,5 +492,124 @@ const styles = StyleSheet.create({
     color: C.primary,
     fontWeight: '500',
     textAlign: 'center',
+  },
+  // ── Nachforderungs-Banner (Farbwelt gespiegelt vom Web-NachforderungBanner) ──
+  nfBanner: {
+    backgroundColor: C.warn,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#c879414d',
+    padding: 16,
+    gap: 6,
+  },
+  nfBannerDringend: {
+    backgroundColor: '#f0dcd2',
+    borderColor: '#d6b0a0',
+  },
+  nfTitel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: C.accent,
+  },
+  nfTitelDringend: {
+    color: '#7a3320',
+  },
+  nfBeschreibung: {
+    fontSize: 14,
+    color: C.text,
+    lineHeight: 20,
+  },
+  nfFrist: {
+    fontSize: 12,
+    color: C.accent,
+    fontWeight: '600',
+  },
+  nfDateiZeile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: C.card,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: C.border,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginTop: 2,
+    gap: 8,
+  },
+  nfDateiName: {
+    flex: 1,
+    fontSize: 13,
+    color: C.text,
+  },
+  nfDateiEntfernen: {
+    fontSize: 14,
+    color: C.muted,
+    fontWeight: '700',
+  },
+  nfAktionen: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 6,
+  },
+  nfWaehlenBtn: {
+    borderWidth: 1,
+    borderColor: C.accent,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  nfWaehlenBtnText: {
+    fontSize: 13,
+    color: C.accent,
+    fontWeight: '600',
+  },
+  nfSendenBtn: {
+    flex: 1,
+    backgroundColor: C.accent,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nfSendenBtnText: {
+    fontSize: 13,
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+  nachgereichtBanner: {
+    backgroundColor: C.ok,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#3a5a3e40',
+    padding: 16,
+    gap: 4,
+  },
+  nachgereichtText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: C.primary,
+  },
+  nachgereichtHinweis: {
+    fontSize: 13,
+    color: C.text,
+  },
+  // Dezenter, rotbraun umrandeter Zweitbutton (destruktive Aktion)
+  zurueckziehenButton: {
+    borderWidth: 1,
+    borderColor: '#7a3320',
+    borderRadius: 10,
+    padding: 14,
+    alignItems: 'center',
+  },
+  zurueckziehenButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#7a3320',
+  },
+  btnDisabled: {
+    opacity: 0.5,
   },
 })

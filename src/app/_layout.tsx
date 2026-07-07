@@ -30,12 +30,14 @@ export default function RootLayout() {
     // ein zu früher router.replace den Stack (toter Zurück-Button).
     if (!navigationState?.key) return
 
-    // Öffentliche Routen (ohne Login erreichbar): Onboarding, Login, Registrierung
-    // (registrieren-auswahl / registrieren-auftraggeber via startsWith).
+    // Öffentliche Routen (ohne Login erreichbar): Onboarding, Login, Passwort-
+    // vergessen, Registrierung (registrieren-auswahl / registrieren-auftraggeber
+    // via startsWith).
     const ersterSegment = segments[0] ?? ''
     const oeffentlich =
       ersterSegment === 'onboarding' ||
       ersterSegment === 'login' ||
+      ersterSegment === 'passwort-vergessen' ||
       ersterSegment.startsWith('registrieren')
 
     if (!session && !oeffentlich) {
@@ -53,6 +55,10 @@ export default function RootLayout() {
       <Stack>
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen name="login" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="passwort-vergessen"
+        options={{ title: 'Passwort vergessen', headerBackTitle: 'Zurück', headerTintColor: '#3a5a3e' }}
+      />
       <Stack.Screen name="registrieren-auswahl" options={{ headerShown: false }} />
       <Stack.Screen name="registrieren" options={{ headerShown: false }} />
       <Stack.Screen name="registrieren-auftraggeber" options={{ headerShown: false }} />
@@ -60,6 +66,10 @@ export default function RootLayout() {
       <Stack.Screen
         name="admin"
         options={{ title: 'Anbieter verifizieren', headerBackTitle: 'Zurück', headerTintColor: '#3a5a3e' }}
+      />
+      <Stack.Screen
+        name="einstellungen"
+        options={{ title: 'Einstellungen', headerBackTitle: 'Zurück', headerTintColor: '#3a5a3e' }}
       />
       <Stack.Screen
         name="eigenerklarungen"
