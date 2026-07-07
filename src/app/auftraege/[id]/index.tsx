@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react'
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
+import { File, Paths } from 'expo-file-system'
+import * as Sharing from 'expo-sharing'
 import { supabase } from '@/lib/supabase'
 import { authedFetch } from '@/lib/authedFetch'
 import { budgetRange } from '@/lib/budgetRange'
@@ -61,6 +63,7 @@ export default function AuftragDetailScreen() {
   const [nfBusy, setNfBusy] = useState<string | null>(null)
   const [nachgereicht, setNachgereicht] = useState<Record<string, boolean>>({})
   const [zieheZurueck, setZieheZurueck] = useState(false)
+  const [pdfBusy, setPdfBusy] = useState(false)
 
   const laden = useCallback(async () => {
     if (!id) return
@@ -177,6 +180,48 @@ export default function AuftragDetailScreen() {
       Alert.alert('Verbindungsfehler', e instanceof Error ? e.message : String(e))
     } finally {
       setNfBusy(null)
+    }
+  }
+
+  // ── Angebots-PDF nach Zuschlag öffnen ──────────────────────────────────────
+  // Bearer-GET auf /api/angebot-pdf/{bewerbungId} (liefert application/pdf),
+  // Bytes in den Cache schreiben und über das System-Share-Sheet öffnen
+  // (iOS zeigt Quick-Look, Android bietet PDF-Viewer an).
+  async function angebotsPdfOeffnen() {
+    if (!meineBewerbung || pdfBusy) return
+    setPdfBusy(true)
+    try {
+      const res = await authedFetch(`/api/angebot-pdf/${meineBewerbung.id}`)
+      if (res.status === 401) {
+        Alert.alert('Sitzung abgelaufen', 'Bitte melden Sie sich erneut an.')
+        return
+      }
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string }
+        Alert.alert('Fehler', j.error ?? 'Das Angebots-PDF konnte nicht geladen werden.')
+        return
+      }
+      const bytes = new Uint8Array(await res.arrayBuffer())
+      // Neue expo-file-system-API (SDK 54): File/Paths statt Legacy-cacheDirectory.
+      const file = new File(Paths.cache, `angebot-${meineBewerbung.id}.pdf`)
+      file.create({ overwrite: true, intermediates: true })
+      file.write(bytes)
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(file.uri, {
+          mimeType: 'application/pdf',
+          UTI: 'com.adobe.pdf',
+          dialogTitle: 'Angebots-PDF',
+        })
+      } else {
+        Alert.alert(
+          'Nicht verfügbar',
+          'Das Öffnen von Dateien wird auf diesem Gerät nicht unterstützt.',
+        )
+      }
+    } catch (e) {
+      Alert.alert('Verbindungsfehler', e instanceof Error ? e.message : String(e))
+    } finally {
+      setPdfBusy(false)
     }
   }
 
@@ -343,9 +388,29 @@ export default function AuftragDetailScreen() {
       <View style={styles.ctaBlock}>
         {meineBewerbung ? (
           <View style={{ gap: 12 }}>
-            <View style={styles.beworbenBanner}>
-              <Text style={styles.beworbenText}>Sie haben bereits ein Angebot abgegeben.</Text>
-            </View>
+            {meineBewerbung.status === 'zuschlag' ? (
+              <View style={styles.zuschlagBanner}>
+                <Text style={styles.zuschlagTitel}>🎉 Sie haben den Zuschlag erhalten!</Text>
+                <Pressable
+                  style={[styles.pdfButton, pdfBusy && styles.btnDisabled]}
+                  onPress={() => void angebotsPdfOeffnen()}
+                  disabled={pdfBusy}
+                  accessibilityRole="button"
+                >
+                  {pdfBusy ? (
+                    <ActivityIndicator color="#ffffff" size="small" />
+                  ) : (
+                    <Text style={styles.pdfButtonText}>Angebots-PDF öffnen</Text>
+                  )}
+                </Pressable>
+              </View>
+            ) : meineBewerbung.status === 'abgelehnt' ? (
+              <Text style={styles.abgelehntHinweis}>Ihr Angebot wurde nicht berücksichtigt.</Text>
+            ) : (
+              <View style={styles.beworbenBanner}>
+                <Text style={styles.beworbenText}>Sie haben bereits ein Angebot abgegeben.</Text>
+              </View>
+            )}
             {aktiv && ['eingereicht', 'in_pruefung'].includes(meineBewerbung.status) ? (
               <>
                 <Pressable
@@ -492,6 +557,39 @@ const styles = StyleSheet.create({
     color: C.primary,
     fontWeight: '500',
     textAlign: 'center',
+  },
+  // ── Zuschlag-Erfolgsbanner + PDF-Button ─────────────────────────────────────
+  zuschlagBanner: {
+    backgroundColor: C.ok,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#3a5a3e40',
+    padding: 16,
+    gap: 12,
+  },
+  zuschlagTitel: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: C.primary,
+    textAlign: 'center',
+  },
+  pdfButton: {
+    backgroundColor: C.primary,
+    borderRadius: 10,
+    padding: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pdfButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  abgelehntHinweis: {
+    fontSize: 14,
+    color: C.muted,
+    textAlign: 'center',
+    paddingVertical: 8,
   },
   // ── Nachforderungs-Banner (Farbwelt gespiegelt vom Web-NachforderungBanner) ──
   nfBanner: {

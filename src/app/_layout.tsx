@@ -76,6 +76,10 @@ export default function RootLayout() {
         options={{ title: 'Nachweise & Erklärungen', headerBackTitle: 'Zurück', headerTintColor: '#3a5a3e' }}
       />
       <Stack.Screen
+        name="benachrichtigungen"
+        options={{ title: 'Benachrichtigungen', headerBackTitle: 'Zurück', headerTintColor: '#3a5a3e' }}
+      />
+      <Stack.Screen
         name="auftraege/[id]/index"
         options={{ title: 'Ausschreibung', headerBackTitle: 'Zurück', headerTintColor: '#3a5a3e' }}
       />

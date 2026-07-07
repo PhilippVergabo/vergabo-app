@@ -49,6 +49,8 @@ export function AnbieterHome() {
   const [gewerkFilter, setGewerkFilter] = useState<string | null>(null)
   // null = noch unbekannt (kein Banner-Flackern beim Laden)
   const [verifiziert, setVerifiziert] = useState<boolean | null>(null)
+  // Anzahl ungelesener Benachrichtigungen (Badge am 🔔)
+  const [ungeleseneAnzahl, setUngeleseneAnzahl] = useState(0)
 
   // In den Daten vorhandene Gewerke (für die Filter-Chips)
   const vorhandeneGewerke = useMemo(() => {
@@ -79,6 +81,7 @@ export function AnbieterHome() {
       { data: bewerbungenData },
       { data: einladungenData },
       { data: profilData },
+      { count: ungeleseneCount },
     ] = await Promise.all([
       // Alle Verfahren laden — RLS regelt die Sichtbarkeit (beschränkte
       // Ausschreibungen sieht der Anbieter nur, wenn er eingeladen ist).
@@ -95,6 +98,11 @@ export function AnbieterHome() {
       supabase.from('einladungen').select('auftrag_id'),
       // Own-Row-RLS: liefert nur das eigene Profil (für den Verifizierungs-Hinweis)
       supabase.from('anbieter_profile').select('verifiziert').maybeSingle(),
+      // Ungelesene Benachrichtigungen zählen (RLS liefert nur die eigenen)
+      supabase
+        .from('benachrichtigungen')
+        .select('id', { count: 'exact', head: true })
+        .eq('gelesen', false),
     ])
 
     if (auftraegeError) {
@@ -110,6 +118,7 @@ export function AnbieterHome() {
     setMeineAngebote(angebote)
     setEinladungen(new Set((einladungenData ?? []).map((e) => e.auftrag_id)))
     setVerifiziert(profilData?.verifiziert ?? null)
+    setUngeleseneAnzahl(ungeleseneCount ?? 0)
   }, [])
 
   // Bei jedem Fokus neu laden, damit der "Beworben"-Status nach dem Einreichen
@@ -158,6 +167,17 @@ export function AnbieterHome() {
             accessibilityLabel="Nachweise und Erklärungen verwalten"
           >
             <Text style={styles.headerLink}>Nachweise</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/benachrichtigungen' as Href)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`Benachrichtigungen (${ungeleseneAnzahl} ungelesen)`}
+          >
+            <View>
+              <Text style={styles.headerIcon}>{'🔔'}</Text>
+              {ungeleseneAnzahl > 0 ? <View style={styles.badgePunkt} /> : null}
+            </View>
           </Pressable>
           <Pressable
             onPress={() => router.push('/einstellungen' as Href)}
@@ -291,6 +311,17 @@ const styles = StyleSheet.create({
   headerAktionen: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   headerLink: { fontSize: 14, color: C.primary, fontWeight: '600' },
   headerIcon: { fontSize: 16 },
+  badgePunkt: {
+    position: 'absolute',
+    top: -2,
+    right: -3,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: C.accent,
+    borderWidth: 1.5,
+    borderColor: C.bg,
+  },
   logout: { fontSize: 14, color: C.muted },
   filterBar: {
     paddingTop: 12,
