@@ -1,8 +1,11 @@
 import { useCallback, useState } from 'react'
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
-import { File, Paths } from 'expo-file-system'
-import * as Sharing from 'expo-sharing'
+// HINWEIS: expo-file-system/expo-sharing sind NATIVE Module, die erst nach dem
+// letzten Dev-Build hinzukamen. Top-Level-Imports würden die Route (und damit
+// die ganze App) in älteren Builds beim Laden crashen ("Cannot find native
+// module 'ExpoSharing'") — daher lazy require erst beim Button-Tap, mit
+// sauberem Hinweis, falls der Build die Module noch nicht enthält.
 import { supabase } from '@/lib/supabase'
 import { authedFetch } from '@/lib/authedFetch'
 import { budgetRange } from '@/lib/budgetRange'
@@ -202,12 +205,27 @@ export default function AuftragDetailScreen() {
         return
       }
       const bytes = new Uint8Array(await res.arrayBuffer())
+      // Lazy require: crasht nicht beim Route-Laden, sondern liefert hier einen
+      // verständlichen Hinweis, wenn der installierte Dev-Build die nativen
+      // Module (expo-file-system/expo-sharing) noch nicht enthält.
+      let FileSystemMod: typeof import('expo-file-system')
+      let SharingMod: typeof import('expo-sharing')
+      try {
+        FileSystemMod = require('expo-file-system')
+        SharingMod = require('expo-sharing')
+      } catch {
+        Alert.alert(
+          'App-Update erforderlich',
+          'Diese Funktion benötigt eine neuere App-Version (neuer Entwicklungs-Build).',
+        )
+        return
+      }
       // Neue expo-file-system-API (SDK 54): File/Paths statt Legacy-cacheDirectory.
-      const file = new File(Paths.cache, `angebot-${meineBewerbung.id}.pdf`)
+      const file = new FileSystemMod.File(FileSystemMod.Paths.cache, `angebot-${meineBewerbung.id}.pdf`)
       file.create({ overwrite: true, intermediates: true })
       file.write(bytes)
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(file.uri, {
+      if (await SharingMod.isAvailableAsync()) {
+        await SharingMod.shareAsync(file.uri, {
           mimeType: 'application/pdf',
           UTI: 'com.adobe.pdf',
           dialogTitle: 'Angebots-PDF',
