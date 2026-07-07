@@ -9,6 +9,7 @@ import {
 } from 'react-native'
 import * as WebBrowser from 'expo-web-browser'
 import Constants from 'expo-constants'
+import { useRouter, type Href } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { authedFetch } from '@/lib/authedFetch'
 import { abmeldenMitBestaetigung } from '@/lib/auth'
@@ -24,6 +25,7 @@ const RECHTLICHE_LINKS = [
 ] as const
 
 export default function EinstellungenScreen() {
+  const router = useRouter()
   const [email, setEmail] = useState<string | null>(null)
   const [loeschenLaeuft, setLoeschenLaeuft] = useState(false)
 
@@ -95,6 +97,21 @@ export default function EinstellungenScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {/* Mein Profil */}
+      <View style={styles.card}>
+        <Pressable
+          style={styles.linkRow}
+          onPress={() => router.push('/profil' as Href)}
+          accessibilityRole="button"
+        >
+          <View style={{ flexShrink: 1, gap: 2 }}>
+            <Text style={styles.linkText}>Mein Profil</Text>
+            <Text style={styles.linkHinweis}>Firmendaten, Standort, Gewerke bearbeiten</Text>
+          </View>
+          <Text style={styles.linkChevron}>›</Text>
+        </Pressable>
+      </View>
+
       {/* Konto */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Konto</Text>
@@ -227,6 +244,10 @@ const styles = StyleSheet.create({
   },
   linkChevron: {
     fontSize: 20,
+    color: C.muted,
+  },
+  linkHinweis: {
+    fontSize: 12,
     color: C.muted,
   },
   gefahrCard: {

@@ -72,6 +72,10 @@ export default function RootLayout() {
         options={{ title: 'Einstellungen', headerBackTitle: 'Zurück', headerTintColor: '#3a5a3e' }}
       />
       <Stack.Screen
+        name="profil"
+        options={{ title: 'Mein Profil', headerBackTitle: 'Zurück', headerTintColor: '#3a5a3e' }}
+      />
+      <Stack.Screen
         name="eigenerklarungen"
         options={{ title: 'Nachweise & Erklärungen', headerBackTitle: 'Zurück', headerTintColor: '#3a5a3e' }}
       />
