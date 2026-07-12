@@ -20,6 +20,7 @@ type AuftragDetail = {
   titel: string
   beschreibung: string | null
   gewerk: string | null
+  ausfuehrungsort_adresse: string | null
   ausfuehrungsort_plz: string | null
   ausfuehrungsort_ort: string | null
   frist: string | null
@@ -74,7 +75,7 @@ export default function AuftragDetailScreen() {
       supabase
         .from('auftraege')
         .select(
-          'id, titel, beschreibung, gewerk, ausfuehrungsort_plz, ausfuehrungsort_ort, frist:angebotsfrist, budget_max:budget_bis, status',
+          'id, titel, beschreibung, gewerk, ausfuehrungsort_adresse, ausfuehrungsort_plz, ausfuehrungsort_ort, frist:angebotsfrist, budget_max:budget_bis, status',
         )
         .eq('id', id)
         .single(),
@@ -292,7 +293,10 @@ export default function AuftragDetailScreen() {
     )
   }
 
-  const ort = [auftrag.ausfuehrungsort_plz, auftrag.ausfuehrungsort_ort].filter(Boolean).join(' ')
+  // Volle Adresse (seit der Wizard-Umstellung Pflicht); ältere Aufträge ohne
+  // Adresse fallen auf "PLZ Ort" zurück.
+  const plzOrt = [auftrag.ausfuehrungsort_plz, auftrag.ausfuehrungsort_ort].filter(Boolean).join(' ')
+  const ort = [auftrag.ausfuehrungsort_adresse, plzOrt].filter(Boolean).join(', ')
   // Anbieter sehen nur die grobe Budget-Klasse (Basis budget_bis), nie exakte Werte.
   const budgetText = auftrag.budget_max != null ? budgetRange(auftrag.budget_max) : null
   // Angebote nur möglich, solange veröffentlicht UND die Angebotsfrist nicht
