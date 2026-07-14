@@ -87,6 +87,11 @@ export default function ProfilScreen() {
   const [gewerke, setGewerke] = useState<string[]>([])
   // Exakte Koordinaten aus der DB; werden bei Adressänderung verworfen (s. o.).
   const [koordinaten, setKoordinaten] = useState<{ lat: number; lon: number } | null>(null)
+  // Erhaltene Bewertungen (nur Anzeige; gepflegt von /api/auftrag-abschliessen)
+  const [bewertung, setBewertung] = useState<{ avg: number | null; anzahl: number }>({
+    avg: null,
+    anzahl: 0,
+  })
   // Geschäftsdaten für Angebots-PDFs
   const [ustId, setUstId] = useState('')
   const [bankname, setBankname] = useState('')
@@ -114,6 +119,7 @@ export default function ProfilScreen() {
       }
       setFirmenname(profil.firmenname ?? '')
       setInhaberName(profil.inhaber_name ?? '')
+      setBewertung({ avg: profil.bewertung_avg ?? null, anzahl: profil.anzahl_bewertungen ?? 0 })
       setRechtsform(profil.rechtsform ?? '')
       setSteuernummer(profil.steuernummer ?? '')
       // Straße + Hausnummer in EIN Feld (wie im Web-Profil); Altdaten mit
@@ -230,6 +236,20 @@ export default function ProfilScreen() {
         <Text style={styles.intro}>
           Diese Daten sehen Auftraggeber, wenn Sie ein Angebot abgeben.
         </Text>
+
+        {/* Erhaltene Bewertungen (nur wenn vorhanden) */}
+        {bewertung.anzahl > 0 && bewertung.avg != null ? (
+          <View style={styles.bewertungCard}>
+            <Text style={styles.bewertungWert}>
+              ★ {bewertung.avg.toFixed(1).replace('.', ',')}
+            </Text>
+            <Text style={styles.bewertungInfo}>
+              Ihre Bewertung aus {bewertung.anzahl}{' '}
+              {bewertung.anzahl === 1 ? 'abgeschlossenen Auftrag' : 'abgeschlossenen Aufträgen'} –
+              sichtbar für Auftraggeber
+            </Text>
+          </View>
+        ) : null}
 
         {/* Firmendaten */}
         <View style={styles.card}>
@@ -417,6 +437,27 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: C.bg },
   content: { padding: 16, paddingBottom: 48, gap: 16 },
   intro: { fontSize: 13, color: C.muted, lineHeight: 18 },
+  bewertungCard: {
+    backgroundColor: C.card,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e0a83c66',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  bewertungWert: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#e0a83c',
+  },
+  bewertungInfo: {
+    flex: 1,
+    fontSize: 12,
+    color: C.muted,
+    lineHeight: 17,
+  },
   card: {
     backgroundColor: C.card,
     borderRadius: 16,

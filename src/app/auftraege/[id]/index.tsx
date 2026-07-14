@@ -68,10 +68,16 @@ export default function AuftragDetailScreen() {
   const [nachgereicht, setNachgereicht] = useState<Record<string, boolean>>({})
   const [zieheZurueck, setZieheZurueck] = useState(false)
   const [pdfBusy, setPdfBusy] = useState(false)
+  // Nach Abschluss durch den AG: die eigene erhaltene Bewertung (RLS liefert
+  // die Zeile nur für den bewerteten Anbieter — für alle anderen null).
+  const [erhalteneBewertung, setErhalteneBewertung] = useState<{
+    sterne: number
+    kommentar: string | null
+  } | null>(null)
 
   const laden = useCallback(async () => {
     if (!id) return
-    const [{ data: a }, { data: b }] = await Promise.all([
+    const [{ data: a }, { data: b }, { data: bw }] = await Promise.all([
       supabase
         .from('auftraege')
         .select(
@@ -87,10 +93,12 @@ export default function AuftragDetailScreen() {
         .eq('auftrag_id', id)
         .neq('status', 'zurueckgezogen')
         .limit(1),
+      supabase.from('bewertungen').select('sterne, kommentar').eq('auftrag_id', id).maybeSingle(),
     ])
     setAuftrag(a as AuftragDetail | null)
     const meine = (b ?? [])[0] as { id: string; status: string } | undefined
     setMeineBewerbung(meine ?? null)
+    setErhalteneBewertung((bw as { sterne: number; kommentar: string | null } | null) ?? null)
 
     // Offene Nachforderungen zur eigenen Bewerbung (Bearer-API der Web-Plattform).
     if (meine) {
@@ -412,7 +420,35 @@ export default function AuftragDetailScreen() {
           <View style={{ gap: 12 }}>
             {meineBewerbung.status === 'zuschlag' ? (
               <View style={styles.zuschlagBanner}>
-                <Text style={styles.zuschlagTitel}>🎉 Sie haben den Zuschlag erhalten!</Text>
+                <Text style={styles.zuschlagTitel}>
+                  {auftrag.status === 'abgeschlossen'
+                    ? '🏁 Auftrag abgeschlossen'
+                    : '🎉 Sie haben den Zuschlag erhalten!'}
+                </Text>
+                {auftrag.status === 'abgeschlossen' ? (
+                  <View style={styles.abschlussBlock}>
+                    <Text style={styles.abschlussText}>
+                      Der Auftraggeber hat den Auftrag als abgeschlossen markiert. Vielen Dank
+                      für Ihre Arbeit!
+                    </Text>
+                    {erhalteneBewertung ? (
+                      <>
+                        <Text style={styles.bewertungSterne}>
+                          {'★'.repeat(erhalteneBewertung.sterne)}
+                          {'☆'.repeat(5 - erhalteneBewertung.sterne)}
+                          <Text style={styles.bewertungZahl}>
+                            {'  '}{erhalteneBewertung.sterne} von 5
+                          </Text>
+                        </Text>
+                        {erhalteneBewertung.kommentar ? (
+                          <Text style={styles.bewertungKommentar}>
+                            „{erhalteneBewertung.kommentar}"
+                          </Text>
+                        ) : null}
+                      </>
+                    ) : null}
+                  </View>
+                ) : null}
                 <Pressable
                   style={[styles.pdfButton, pdfBusy && styles.btnDisabled]}
                   onPress={() => void angebotsPdfOeffnen()}
@@ -593,6 +629,32 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: C.primary,
+    textAlign: 'center',
+  },
+  abschlussBlock: {
+    gap: 6,
+    alignItems: 'center',
+  },
+  abschlussText: {
+    fontSize: 13,
+    color: C.primary,
+    textAlign: 'center',
+    lineHeight: 19,
+  },
+  bewertungSterne: {
+    fontSize: 20,
+    color: '#e0a83c',
+    letterSpacing: 2,
+  },
+  bewertungZahl: {
+    fontSize: 13,
+    color: C.primary,
+    letterSpacing: 0,
+  },
+  bewertungKommentar: {
+    fontSize: 13,
+    color: C.primary,
+    fontStyle: 'italic',
     textAlign: 'center',
   },
   pdfButton: {
