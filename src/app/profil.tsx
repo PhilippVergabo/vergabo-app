@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native'
 import { supabase } from '@/lib/supabase'
+import { AdressAutocomplete } from '@/components/AdressAutocomplete'
 import { bundeslandKuerzel } from '@/lib/adressSuche'
 import { GEWERK_LABELS } from '@/lib/labels'
 import { C } from '@/lib/theme'
@@ -19,11 +20,10 @@ import { C } from '@/lib/theme'
 // Anbieter-Profil bearbeiten — Pendant zu app/dashboard/anbieter/profil im Web.
 // Direktes Supabase-Update auf anbieter_profile (Own-Row-RLS), nur eigene Zeile.
 //
-// Koordinaten (lat/lon): Es gibt hier bewusst KEINE Adress-Autocomplete. Beim
-// Laden vorhandene exakte Koordinaten bleiben erhalten, solange die Adresse
-// unverändert ist; jede manuelle Änderung an Straße/PLZ/Ort verwirft sie
-// (→ null). Das Matching fällt dann serverseitig auf den PLZ-Mittelpunkt
-// zurück — wie im Web bei manueller Adressänderung.
+// Koordinaten (lat/lon): Adresseingabe mit Photon-Autocomplete (wie im Web).
+// Die Auswahl eines Vorschlags setzt exakte Koordinaten; eine manuelle
+// Änderung an der Straße verwirft sie (→ null), dann greift der
+// PLZ-Mittelpunkt-Fallback beim Matching und Umkreis-Filter.
 
 const RECHTSFORMEN = [
   { value: 'einzelunternehmen', label: 'Einzelunternehmen' },
@@ -300,15 +300,20 @@ export default function ProfilScreen() {
           <Text style={styles.cardTitle}>Standort & Einsatzgebiet</Text>
 
           <Text style={styles.feldLabel}>Straße und Hausnummer</Text>
-          <TextInput
-            style={styles.input}
+          <AdressAutocomplete
             value={strasse}
-            onChangeText={(t) => {
+            onChange={(t) => {
               setStrasse(t)
               setKoordinaten(null)
             }}
-            placeholder="Musterstraße 12a"
-            placeholderTextColor={C.muted}
+            onSelect={(v) => {
+              setStrasse(v.strasseKomplett || v.strasse)
+              if (v.plz) setPlz(v.plz)
+              if (v.ort) setOrt(v.ort)
+              if (v.bundesland) setBundesland(v.bundesland)
+              setKoordinaten(v.lat != null && v.lon != null ? { lat: v.lat, lon: v.lon } : null)
+            }}
+            placeholder="Musterstraße 12a (mit Vorschlägen)"
           />
 
           <View style={styles.zeile}>

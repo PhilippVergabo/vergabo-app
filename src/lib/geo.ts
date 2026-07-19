@@ -21,20 +21,34 @@ export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: numb
 // für die App-Laufzeit reicht (das Web cached zusätzlich in Redis).
 const cache = new Map<string, Koordinaten | null>()
 
-/** PLZ → { lat, lng } via OpenPLZ API. null, wenn die PLZ nicht auflösbar ist. */
+/**
+ * PLZ → { lat, lng } über die Photon-API (Komoot/OSM) — dieselbe Quelle wie das
+ * Adress-Autocomplete. WICHTIG: OpenPLZ liefert KEINE Koordinaten, daher Photon
+ * mit PLZ-Suche (osm_value === 'postcode' → Mittelpunkt des PLZ-Gebiets).
+ * null, wenn die PLZ nicht auflösbar ist.
+ */
 export async function plzKoordinaten(plz: string): Promise<Koordinaten | null> {
   const cached = cache.get(plz)
   if (cached !== undefined) return cached
   try {
     const res = await fetch(
-      `https://openplzapi.org/de/Localities?postalCode=${encodeURIComponent(plz)}`,
+      `https://photon.komoot.io/api/?q=${encodeURIComponent(`${plz} Deutschland`)}&lang=de&limit=3`,
     )
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = await res.json()
-    const k =
-      Array.isArray(data) && data.length > 0 && data[0].latitude != null
-        ? { lat: Number(data[0].latitude), lng: Number(data[0].longitude) }
-        : null
+    type Feature = {
+      properties?: { osm_value?: string; name?: string; postcode?: string; countrycode?: string }
+      geometry?: { coordinates?: [number, number] }
+    }
+    const features: Feature[] = Array.isArray(data?.features) ? data.features : []
+    const treffer = features.find(
+      f =>
+        f?.properties?.osm_value === 'postcode' &&
+        f?.properties?.countrycode === 'DE' &&
+        (f?.properties?.name === plz || f?.properties?.postcode === plz),
+    )
+    const coords = treffer?.geometry?.coordinates
+    const k = Array.isArray(coords) ? { lat: coords[1], lng: coords[0] } : null
     cache.set(plz, k)
     return k
   } catch {
