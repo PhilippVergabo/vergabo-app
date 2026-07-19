@@ -22,6 +22,7 @@ export default function RegistrierenAuswahl() {
         <Text style={styles.optionTitel}>Ich bin Anbieter</Text>
         <Text style={styles.optionText}>
           Handwerksbetrieb, der öffentliche Aufträge finden und Angebote abgeben möchte.
+          Dauerhaft kostenlos.
         </Text>
       </Pressable>
 
@@ -32,7 +33,8 @@ export default function RegistrierenAuswahl() {
         <Text style={styles.optionIcon}>🏛️</Text>
         <Text style={styles.optionTitel}>Ich bin Auftraggeber</Text>
         <Text style={styles.optionText}>
-          Kommune, Behörde oder Schule, die Aufträge rechtssicher vergeben möchte.
+          Kommune, Behörde oder Schule, die Aufträge rechtssicher nach UVgO vergeben möchte.
+          In der Pilotphase kostenlos.
         </Text>
       </Pressable>
 

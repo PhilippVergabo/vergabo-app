@@ -194,7 +194,7 @@ export default function LoginScreen() {
           </>
         ) : (
           <>
-            <Text style={styles.subtitle}>Anbieter & Auftraggeber</Text>
+            <Text style={styles.subtitle}>Vergabe einfach gemacht</Text>
 
             <TextInput
               style={styles.input}

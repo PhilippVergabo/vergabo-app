@@ -16,16 +16,18 @@ import { VergaboLogo } from '@/components/VergaboLogo'
 import { C } from '@/lib/theme'
 
 // Versionierter Schlüssel: hochzählen setzt das Onboarding für alle einmalig zurück.
-const ONBOARDING_FLAG = 'onboarding_gesehen_v2'
+const ONBOARDING_FLAG = 'onboarding_gesehen_v3'
 
 type Slide = { icon: string; titel: string; text: string; logo?: boolean }
 
+// Texte angelehnt an die Web-Startseite (Hero + „Für wen?/Warum jetzt?"):
+// gleiche Kernbotschaften, gleiches Wording — nur auf App-Nutzer (Anbieter) fokussiert.
 const SLIDES: Slide[] = [
   {
     icon: '',
     logo: true,
     titel: 'Vergabo',
-    text: 'Öffentliche Aufträge bis 25.000 € — einfach finden und rechtssicher vergeben. Speziell für Handwerksbetriebe und öffentliche Auftraggeber.',
+    text: 'Öffentliche Bauaufträge bis 25.000 € — einfach finden, rechtssicher gewinnen. Für Handwerksbetriebe dauerhaft kostenlos.',
   },
   {
     icon: '🔍',
@@ -36,6 +38,11 @@ const SLIDES: Slide[] = [
     icon: '📨',
     titel: 'Mit wenigen Klicks bieten',
     text: 'Reichen Sie Ihr Angebot direkt in der App ein: Kalkulation, Eignungsnachweise und Anhänge — fertig.',
+  },
+  {
+    icon: '🔔',
+    titel: 'Keine Ausschreibung verpassen',
+    text: 'Sie erhalten eine Benachrichtigung, sobald ein neuer Auftrag in Ihrem Gewerk und Umkreis erscheint. Früh dabei sein lohnt sich: Aktuell konkurrieren nur wenige Betriebe je Ausschreibung.',
   },
 ]
 
