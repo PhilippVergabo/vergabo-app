@@ -11,6 +11,8 @@ export type AuftragItem = {
   vergabeverfahren: string | null
   ausfuehrungsort_plz: string | null
   ausfuehrungsort_ort: string | null
+  ausfuehrungsort_lat?: number | null
+  ausfuehrungsort_lon?: number | null
   frist: string | null
   budget_max: number | null
   created_at: string

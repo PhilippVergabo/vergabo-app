@@ -16,6 +16,7 @@ import { supabase } from '@/lib/supabase'
 import { AuftragKarte, type AuftragItem } from '@/components/AuftragKarte'
 import { addPushTapListener, registriereFuerPush } from '@/lib/push'
 import { gewerkLabel } from '@/lib/labels'
+import { haversineKm, plzKoordinaten } from '@/lib/geo'
 import { C } from '@/lib/theme'
 
 function Chip({ label, aktiv, onPress }: { label: string; aktiv: boolean; onPress: () => void }) {
@@ -46,6 +47,19 @@ export function AnbieterHome() {
   const [error, setError] = useState<string | null>(null)
   const [suche, setSuche] = useState('')
   const [gewerkFilter, setGewerkFilter] = useState<string | null>(null)
+  // Standard: nur passende Aufträge (eigene Gewerke + Aktionsradius) — wie das
+  // serverseitige Matching für die Push-Benachrichtigungen. „Alle" schaltet um.
+  const [modus, setModus] = useState<'passend' | 'alle'>('passend')
+  // Eigenes Profil für den Passend-Filter (Own-Row-RLS)
+  const [profil, setProfil] = useState<{
+    gewerke: string[]
+    radius: number
+    lat: number | null
+    lon: number | null
+    plz: string | null
+  } | null>(null)
+  // auftrag_id → Luftlinie in km (null = nicht bestimmbar → nicht ausfiltern)
+  const [distanzen, setDistanzen] = useState<Map<string, number | null>>(new Map())
   // null = noch unbekannt (kein Banner-Flackern beim Laden)
   const [verifiziert, setVerifiziert] = useState<boolean | null>(null)
   // Anzahl ungelesener Benachrichtigungen (Badge am 🔔)
@@ -61,6 +75,15 @@ export function AnbieterHome() {
   const gefilterteAuftraege = useMemo(() => {
     const q = suche.trim().toLowerCase()
     const gefiltert = auftraege.filter((a) => {
+      // Passend-Modus: eigene Gewerke + Aktionsradius. Eingeladene und bereits
+      // beworbene Aufträge sind per Definition relevant und bleiben sichtbar.
+      if (modus === 'passend' && profil && !einladungen.has(a.id) && !meineAngebote.has(a.id)) {
+        if (profil.gewerke.length > 0 && (!a.gewerk || !profil.gewerke.includes(a.gewerk))) {
+          return false
+        }
+        const d = distanzen.get(a.id)
+        if (d != null && d > profil.radius) return false
+      }
       if (gewerkFilter && a.gewerk !== gewerkFilter) return false
       if (!q) return true
       const heuhaufen = [a.titel, a.ausfuehrungsort_ort, a.ausfuehrungsort_plz, gewerkLabel(a.gewerk)]
@@ -72,7 +95,16 @@ export function AnbieterHome() {
     // Eingeladene Aufträge nach oben; innerhalb der Gruppen bleibt die
     // Lade-Reihenfolge (neueste zuerst) erhalten — sort() ist stabil.
     return gefiltert.sort((a, b) => Number(einladungen.has(b.id)) - Number(einladungen.has(a.id)))
-  }, [auftraege, suche, gewerkFilter, einladungen])
+  }, [auftraege, suche, gewerkFilter, einladungen, modus, profil, distanzen, meineAngebote])
+
+  // Gewerk-Chips: im Passend-Modus nur die eigenen Gewerke anbieten
+  const chipGewerke = useMemo(
+    () =>
+      modus === 'passend' && profil && profil.gewerke.length > 0
+        ? vorhandeneGewerke.filter((g) => profil.gewerke.includes(g))
+        : vorhandeneGewerke,
+    [modus, profil, vorhandeneGewerke],
+  )
 
   const loadData = useCallback(async () => {
     const [
@@ -87,7 +119,7 @@ export function AnbieterHome() {
       supabase
         .from('auftraege')
         .select(
-          'id, titel, gewerk, vergabeverfahren, ausfuehrungsort_plz, ausfuehrungsort_ort, frist:angebotsfrist, budget_max:budget_bis, created_at:erstellt_am',
+          'id, titel, gewerk, vergabeverfahren, ausfuehrungsort_plz, ausfuehrungsort_ort, ausfuehrungsort_lat, ausfuehrungsort_lon, frist:angebotsfrist, budget_max:budget_bis, created_at:erstellt_am',
         )
         .eq('status', 'veroeffentlicht')
         .order('erstellt_am', { ascending: false }),
@@ -95,8 +127,11 @@ export function AnbieterHome() {
       supabase.from('bewerbungen').select('auftrag_id, angebotspreis_netto'),
       // RLS liefert nur die EIGENEN Einladungen
       supabase.from('einladungen').select('auftrag_id'),
-      // Own-Row-RLS: liefert nur das eigene Profil (für den Verifizierungs-Hinweis)
-      supabase.from('anbieter_profile').select('verifiziert').maybeSingle(),
+      // Own-Row-RLS: liefert nur das eigene Profil (Verifizierungs-Hinweis + Passend-Filter)
+      supabase
+        .from('anbieter_profile')
+        .select('verifiziert, gewerke, aktionsradius_km, lat, lon, plz')
+        .maybeSingle(),
       // Ungelesene Benachrichtigungen zählen (RLS liefert nur die eigenen)
       supabase
         .from('benachrichtigungen')
@@ -117,8 +152,49 @@ export function AnbieterHome() {
     setMeineAngebote(angebote)
     setEinladungen(new Set((einladungenData ?? []).map((e) => e.auftrag_id)))
     setVerifiziert(profilData?.verifiziert ?? null)
+    setProfil(
+      profilData
+        ? {
+            gewerke: Array.isArray(profilData.gewerke) ? profilData.gewerke : [],
+            radius: profilData.aktionsradius_km ?? 50,
+            lat: profilData.lat ?? null,
+            lon: profilData.lon ?? null,
+            plz: profilData.plz ?? null,
+          }
+        : null,
+    )
     setUngeleseneAnzahl(ungeleseneCount ?? 0)
   }, [])
+
+  // Luftlinien-Distanzen bestimmen: exakte Koordinaten, sonst PLZ-Mittelpunkt
+  // via OpenPLZ (gleiche Quelle wie das Web-Matching). Nicht auflösbare
+  // Distanzen bleiben null und werden bewusst NICHT ausgefiltert.
+  useEffect(() => {
+    let aktiv = true
+    ;(async () => {
+      if (!profil || auftraege.length === 0) return
+      let eigene =
+        profil.lat != null && profil.lon != null ? { lat: profil.lat, lng: profil.lon } : null
+      if (!eigene && profil.plz) eigene = await plzKoordinaten(profil.plz)
+      if (!eigene) {
+        if (aktiv) setDistanzen(new Map())
+        return
+      }
+      const map = new Map<string, number | null>()
+      for (const a of auftraege) {
+        let ziel =
+          a.ausfuehrungsort_lat != null && a.ausfuehrungsort_lon != null
+            ? { lat: a.ausfuehrungsort_lat, lng: a.ausfuehrungsort_lon }
+            : null
+        if (!ziel && a.ausfuehrungsort_plz) ziel = await plzKoordinaten(a.ausfuehrungsort_plz)
+        map.set(a.id, ziel ? haversineKm(eigene.lat, eigene.lng, ziel.lat, ziel.lng) : null)
+      }
+      if (aktiv) setDistanzen(map)
+    })()
+    return () => {
+      aktiv = false
+    }
+  }, [auftraege, profil])
 
   // Bei jedem Fokus neu laden, damit der "Beworben"-Status nach dem Einreichen
   // sofort erscheint (nicht erst nach manuellem Pull-to-Refresh).
@@ -218,23 +294,38 @@ export function AnbieterHome() {
           ) : null}
         </View>
 
-        {vorhandeneGewerke.length > 1 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chips}
-          >
-            <Chip label="Alle" aktiv={gewerkFilter === null} onPress={() => setGewerkFilter(null)} />
-            {vorhandeneGewerke.map((g) => (
-              <Chip
-                key={g}
-                label={gewerkLabel(g)}
-                aktiv={gewerkFilter === g}
-                onPress={() => setGewerkFilter((prev) => (prev === g ? null : g))}
-              />
-            ))}
-          </ScrollView>
-        ) : null}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chips}
+        >
+          <Chip
+            label={profil ? `Passend (${profil.radius} km)` : 'Passend'}
+            aktiv={modus === 'passend'}
+            onPress={() => {
+              setModus('passend')
+              setGewerkFilter(null)
+            }}
+          />
+          <Chip
+            label="Alle"
+            aktiv={modus === 'alle' && gewerkFilter === null}
+            onPress={() => {
+              setModus('alle')
+              setGewerkFilter(null)
+            }}
+          />
+          {chipGewerke.length > 1
+            ? chipGewerke.map((g) => (
+                <Chip
+                  key={g}
+                  label={gewerkLabel(g)}
+                  aktiv={gewerkFilter === g}
+                  onPress={() => setGewerkFilter((prev) => (prev === g ? null : g))}
+                />
+              ))
+            : null}
+        </ScrollView>
       </View>
 
       {verifiziert === false ? (
@@ -274,6 +365,9 @@ export function AnbieterHome() {
             <Text style={styles.count}>
               {gefilterteAuftraege.length}{' '}
               {gefilterteAuftraege.length === 1 ? 'Ausschreibung' : 'Ausschreibungen'}
+              {modus === 'passend' && profil
+                ? ` · passend zu Ihren Gewerken im Umkreis von ${profil.radius} km`
+                : ''}
             </Text>
           ) : null
         }
@@ -283,7 +377,9 @@ export function AnbieterHome() {
               {error
                 ? `Fehler beim Laden: ${error}`
                 : auftraege.length > 0
-                  ? 'Keine Treffer für Ihre Suche'
+                  ? modus === 'passend' && !suche.trim()
+                    ? 'Keine passenden Ausschreibungen in Ihren Gewerken und Ihrem Umkreis. Unter „Alle" sehen Sie sämtliche Verfahren.'
+                    : 'Keine Treffer für Ihre Suche'
                   : 'Keine offenen Ausschreibungen'}
             </Text>
           </View>
@@ -362,6 +458,6 @@ const styles = StyleSheet.create({
   verifBannerLink: { fontWeight: '700', textDecorationLine: 'underline' },
   count: { fontSize: 12, color: C.muted, marginBottom: 12 },
   list: { padding: 16 },
-  empty: { paddingTop: 64, alignItems: 'center' },
-  emptyText: { fontSize: 16, color: C.muted },
+  empty: { paddingTop: 64, alignItems: 'center', paddingHorizontal: 24 },
+  emptyText: { fontSize: 16, color: C.muted, textAlign: 'center', lineHeight: 23 },
 })
