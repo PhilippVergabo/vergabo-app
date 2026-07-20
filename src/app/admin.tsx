@@ -14,6 +14,7 @@ import {
 } from 'react-native'
 import { supabase } from '@/lib/supabase'
 import { authedFetch } from '@/lib/authedFetch'
+import { registriereAdminPush } from '@/lib/push'
 import { GEWERK_LABELS } from '@/lib/labels'
 import { C } from '@/lib/theme'
 import { AdminKarte, type AdminEintrag, type Tab } from '@/components/admin/AdminKarte'
@@ -165,6 +166,7 @@ export default function AdminScreen() {
       }
       if (data.currentLevel === 'aal2') {
         ladeListe('anbieter')
+        void registriereAdminPush()
         return
       }
       // Faktor ermitteln und Code-Schritt zeigen
@@ -199,9 +201,10 @@ export default function AdminScreen() {
         setCode('')
         return
       }
-      // Session ist jetzt aal2 → Liste laden
+      // Session ist jetzt aal2 → Liste laden + Push-Token registrieren
       setCode('')
       await ladeListe(tab)
+      void registriereAdminPush()
     } finally {
       setPruefe(false)
     }
