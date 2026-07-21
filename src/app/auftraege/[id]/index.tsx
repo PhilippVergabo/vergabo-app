@@ -1,5 +1,15 @@
 import { useCallback, useState } from 'react'
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 // HINWEIS: expo-file-system/expo-sharing sind NATIVE Module, die erst nach dem
 // letzten Dev-Build hinzukamen. Top-Level-Imports würden die Route (und damit
@@ -317,7 +327,17 @@ export default function AuftragDetailScreen() {
   )
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    // KeyboardAvoidingView wie in bewerben/bearbeiten: Ohne sie verdeckt die
+    // iOS-Tastatur das Rückfragen-Eingabefeld am Seitenende.
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: C.bg }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+    >
       {auftrag.gewerk ? <Text style={styles.gewerk}>{gewerkLabel(auftrag.gewerk)}</Text> : null}
       <Text style={styles.titel}>{auftrag.titel}</Text>
 
@@ -512,6 +532,7 @@ export default function AuftragDetailScreen() {
           für veröffentlichte Aufträge; nur Rollen-Badges, keine Firmennamen). */}
       <Rueckfragen auftragId={auftrag.id} />
     </ScrollView>
+    </KeyboardAvoidingView>
   )
 }
 
