@@ -22,7 +22,9 @@ export function AnhaengeSektion({
 }: Props) {
   async function anhangWaehlen() {
     const f = await dateiWaehlen()
-    if (f) setAnhaenge((prev) => [...prev, f])
+    // Duplikate nach Dateiname überspringen (wie im Web): gleicher Name würde
+    // beim Upload denselben Storage-Pfad treffen und die Datei überschreiben.
+    if (f) setAnhaenge((prev) => (prev.some((p) => p.name === f.name) ? prev : [...prev, f]))
   }
 
   return (
