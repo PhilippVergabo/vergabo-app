@@ -20,6 +20,7 @@ import { budgetRange } from '@/lib/budgetRange'
 import { dateiWaehlen, type PickedFile } from '@/lib/bewerbung'
 import { sanitizeDateiname } from '@/lib/eigenerklarungTypen'
 import { gewerkLabel } from '@/lib/labels'
+import { AuftragAnhaenge } from '@/components/AuftragAnhaenge'
 import { Rueckfragen } from '@/components/Rueckfragen'
 import { C } from '@/lib/theme'
 
@@ -371,6 +372,9 @@ export default function AuftragDetailScreen() {
           <Text style={styles.beschreibung}>{auftrag.beschreibung}</Text>
         </View>
       ) : null}
+
+      {/* Vergabeunterlagen des Auftraggebers (nur sichtbar, wenn vorhanden) */}
+      <AuftragAnhaenge auftragId={auftrag.id} />
 
       {/* Bestätigung nach erfolgreichem Nachreichen (Nachforderung ist danach
           nicht mehr "offen" und verschwindet aus der Liste). */}
