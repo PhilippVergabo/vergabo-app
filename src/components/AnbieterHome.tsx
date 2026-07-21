@@ -144,11 +144,19 @@ export function AnbieterHome() {
       return
     }
     setError(null)
-    setAuftraege((auftraegeData as AuftragItem[]) ?? [])
     const angebote = new Map<string, number | null>()
     for (const b of bewerbungenData ?? []) {
       angebote.set(b.auftrag_id, b.angebotspreis_netto ?? null)
     }
+    // Abgelaufene Ausschreibungen (Angebotsfrist vorbei) ausblenden — dort kann
+    // niemand mehr bieten. Ausnahme: eigenes Angebot abgegeben → sichtbar
+    // lassen (Nachverfolgen). Direktaufträge ohne Frist bleiben unberührt.
+    const jetzt = Date.now()
+    const sichtbar = ((auftraegeData as AuftragItem[]) ?? []).filter((a) => {
+      const abgelaufen = a.frist ? new Date(a.frist).getTime() < jetzt : false
+      return !abgelaufen || angebote.has(a.id)
+    })
+    setAuftraege(sichtbar)
     setMeineAngebote(angebote)
     setEinladungen(new Set((einladungenData ?? []).map((e) => e.auftrag_id)))
     setVerifiziert(profilData?.verifiziert ?? null)
