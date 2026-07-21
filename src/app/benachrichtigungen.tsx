@@ -158,7 +158,7 @@ export default function BenachrichtigungenScreen() {
         }
         ItemSeparatorComponent={() => <View style={styles.trenner} />}
         renderItem={({ item }) => {
-          const navigierbar = !!item.link && ERLAUBTER_LINK.test(item.link)
+          const navigierbar = appZiel(item.link) !== null
           return (
             <Pressable
               style={({ pressed }) => [
