@@ -2,8 +2,6 @@ import { useCallback, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -327,16 +325,14 @@ export default function AuftragDetailScreen() {
   )
 
   return (
-    // KeyboardAvoidingView wie in bewerben/bearbeiten: Ohne sie verdeckt die
-    // iOS-Tastatur das Rückfragen-Eingabefeld am Seitenende.
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: C.bg }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    // automaticallyAdjustKeyboardInsets: iOS schiebt das Rückfragen-Eingabefeld
+    // über die Tastatur — auch mit der schwebenden Kopfzeile korrekt (eine
+    // KeyboardAvoidingView mit 'padding' kompensierte dort zu wenig).
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets
     >
       {auftrag.gewerk ? <Text style={styles.gewerk}>{gewerkLabel(auftrag.gewerk)}</Text> : null}
       <Text style={styles.titel}>{auftrag.titel}</Text>
@@ -532,7 +528,6 @@ export default function AuftragDetailScreen() {
           für veröffentlichte Aufträge; nur Rollen-Badges, keine Firmennamen). */}
       <Rueckfragen auftragId={auftrag.id} />
     </ScrollView>
-    </KeyboardAvoidingView>
   )
 }
 

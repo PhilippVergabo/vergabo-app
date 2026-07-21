@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -304,11 +302,15 @@ export default function BewerbenScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: C.bg }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      {/* automaticallyAdjustKeyboardInsets statt KeyboardAvoidingView: Mit der
+          schwebenden Kopfzeile kompensierte 'padding' um die Header-Höhe zu
+          wenig — der Einreichen-Button blieb hinter der iOS-Tastatur. */}
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+      >
         {bindefrist ? (
           <View style={styles.bindefrist}>
             <Text style={styles.bindefristText}>
@@ -397,7 +399,7 @@ export default function BewerbenScreen() {
           </Text>
         ) : null}
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   )
 }
 
