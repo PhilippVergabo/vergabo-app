@@ -30,7 +30,14 @@ function formatZeit(iso: string) {
   return `${d.toLocaleDateString('de-DE')} ${d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`
 }
 
-export function Rueckfragen({ auftragId }: { auftragId: string }) {
+export function Rueckfragen({
+  auftragId,
+  onEingabeFokus,
+}: {
+  auftragId: string
+  /** Optional: wird beim Fokussieren des Eingabefelds aufgerufen (Scroll-Anpassung). */
+  onEingabeFokus?: () => void
+}) {
   const [nachrichten, setNachrichten] = useState<Rueckfrage[]>([])
   const [nachricht, setNachricht] = useState('')
   const [laden, setLaden] = useState(true)
@@ -183,6 +190,7 @@ export function Rueckfragen({ auftragId }: { auftragId: string }) {
           style={styles.eingabe}
           value={nachricht}
           onChangeText={setNachricht}
+          onFocus={onEingabeFokus}
           placeholder="Frage stellen oder antworten …"
           placeholderTextColor={C.muted}
           multiline

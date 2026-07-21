@@ -86,9 +86,10 @@ export async function registriereAdminPush(): Promise<void> {
 }
 
 // Whitelist für Push-Deeplinks: ausschließlich Auftragsdetails
-// (/auftraege/<uuid>). Alles andere wird ignoriert, damit manipulierte
+// (/auftraege/<uuid>, optional mit Web-Anker wie #rueckfragen — der Anker wird
+// verworfen). Alles andere wird ignoriert, damit manipulierte
 // Notification-Daten keine beliebige Navigation auslösen können.
-const ERLAUBTER_PUSH_LINK = /^\/auftraege\/[0-9a-f-]{36}$/
+const ERLAUBTER_PUSH_LINK = /^(\/auftraege\/[0-9a-f-]{36})(?:#[\w-]*)?$/
 
 /**
  * Registriert einen Listener für das Antippen einer Push-Nachricht.
@@ -98,7 +99,8 @@ const ERLAUBTER_PUSH_LINK = /^\/auftraege\/[0-9a-f-]{36}$/
 export function addPushTapListener(onTap: (link: string) => void): () => void {
   const sub = Notifications.addNotificationResponseReceivedListener((response) => {
     const link = response.notification.request.content.data?.link
-    if (typeof link === 'string' && ERLAUBTER_PUSH_LINK.test(link)) onTap(link)
+    const treffer = typeof link === 'string' ? link.match(ERLAUBTER_PUSH_LINK) : null
+    if (treffer) onTap(treffer[1])
   })
   return () => sub.remove()
 }

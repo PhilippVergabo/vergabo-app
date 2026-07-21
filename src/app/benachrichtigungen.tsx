@@ -27,10 +27,24 @@ type Benachrichtigung = {
   typ: string
 }
 
-// Whitelist für Deeplinks aus Benachrichtigungen — identisch zu lib/push.ts:
-// ausschließlich Auftragsdetails (/auftraege/<uuid>). Web-Links wie
-// /dashboard/... werden ignoriert (nur als gelesen markiert).
-const ERLAUBTER_LINK = /^\/auftraege\/[0-9a-f-]{36}$/
+// Deeplinks aus Benachrichtigungen auf die App-Route normalisieren:
+// Aus jedem Link-Format (auch Web-Varianten wie
+// /login?next=%2Fauftraege%2F<uuid>%23rueckfragen oder /auftraege/<uuid>#anker)
+// wird die Auftrags-UUID extrahiert → /auftraege/<uuid>. Links ohne
+// Auftragsbezug (z. B. /dashboard) werden ignoriert (nur als gelesen markiert).
+const AUFTRAG_LINK = /\/auftraege\/([0-9a-f-]{36})/
+
+function appZiel(link: string | null): string | null {
+  if (!link) return null
+  let dekodiert = link
+  try {
+    dekodiert = decodeURIComponent(link)
+  } catch {
+    // ungültige Kodierung → Rohwert prüfen
+  }
+  const treffer = dekodiert.match(AUFTRAG_LINK)
+  return treffer ? `/auftraege/${treffer[1]}` : null
+}
 
 /** Relativer Zeitstempel („vor 5 Min.") bzw. Datum für ältere Einträge. */
 function zeitLabel(iso: string): string {
@@ -104,8 +118,9 @@ export default function BenachrichtigungenScreen() {
       setEintraege((prev) => prev.map((e) => (e.id === b.id ? { ...e, gelesen: true } : e)))
       await supabase.from('benachrichtigungen').update({ gelesen: true }).eq('id', b.id)
     }
-    if (b.link && ERLAUBTER_LINK.test(b.link)) {
-      router.push(b.link as Href)
+    const ziel = appZiel(b.link)
+    if (ziel) {
+      router.push(ziel as Href)
     }
   }
 

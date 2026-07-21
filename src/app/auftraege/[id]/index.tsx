@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from 'react-native'
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 // HINWEIS: expo-file-system/expo-sharing sind NATIVE Module, die erst nach dem
 // letzten Dev-Build hinzukamen. Top-Level-Imports würden die Route (und damit
 // die ganze App) in älteren Builds beim Laden crashen ("Cannot find native
@@ -82,6 +82,7 @@ export default function AuftragDetailScreen() {
     sterne: number
     kommentar: string | null
   } | null>(null)
+  const scrollRef = useRef<ScrollView>(null)
 
   const laden = useCallback(async () => {
     if (!id) return
@@ -325,10 +326,31 @@ export default function AuftragDetailScreen() {
   )
 
   return (
-    // automaticallyAdjustKeyboardInsets: iOS schiebt das Rückfragen-Eingabefeld
-    // über die Tastatur — auch mit der schwebenden Kopfzeile korrekt (eine
-    // KeyboardAvoidingView mit 'padding' kompensierte dort zu wenig).
+    <>
+      {/* Zurück-Fallback: Wird das Detail ohne Vorgänger-Screen geöffnet
+          (z. B. Deeplink/Push bei Kaltstart), gäbe es keinen funktionierenden
+          nativen Zurück-Button — dann eigener Button zur Übersicht. */}
+      {!router.canGoBack() && (
+        <Stack.Screen
+          options={{
+            headerLeft: () => (
+              <Pressable
+                onPress={() => router.replace('/')}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Zur Übersicht"
+              >
+                <Text style={{ color: '#3a5a3e', fontSize: 16, fontWeight: '600' }}>‹ Übersicht</Text>
+              </Pressable>
+            ),
+          }}
+        />
+      )}
+    {/* automaticallyAdjustKeyboardInsets: iOS schiebt das Rückfragen-Eingabefeld
+        über die Tastatur — auch mit der schwebenden Kopfzeile korrekt (eine
+        KeyboardAvoidingView mit 'padding' kompensierte dort zu wenig). */}
     <ScrollView
+      ref={scrollRef}
       style={styles.container}
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
@@ -526,8 +548,17 @@ export default function AuftragDetailScreen() {
 
       {/* Öffentliches Q&A – auch vor einer Bewerbung möglich (RLS erlaubt es
           für veröffentlichte Aufträge; nur Rollen-Badges, keine Firmennamen). */}
-      <Rueckfragen auftragId={auftrag.id} />
+      <Rueckfragen
+        auftragId={auftrag.id}
+        // Beim Fokus ans Seitenende scrollen (nach der Tastatur-Animation):
+        // so liegt zwischen Eingabefeld und Tastatur der content-paddingBottom
+        // als Luft, statt dass das Feld direkt an der Tastaturkante klebt.
+        onEingabeFokus={() => {
+          setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300)
+        }}
+      />
     </ScrollView>
+    </>
   )
 }
 
