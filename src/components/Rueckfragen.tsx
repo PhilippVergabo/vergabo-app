@@ -86,6 +86,7 @@ export function Rueckfragen({
             body: JSON.stringify({
               typ,
               userId: empfaengerId,
+              auftragId,
               daten: { auftragTitel, link: `/auftraege/${auftragId}` },
             }),
           })
