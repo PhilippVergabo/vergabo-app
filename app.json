@@ -3,6 +3,12 @@
     "name": "vergabo-app",
     "slug": "vergabo-app",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/36bb5ba6-6445-4ae5-ac40-0c9785b538c9"
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "vergaboapp",
