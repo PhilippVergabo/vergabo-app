@@ -80,10 +80,13 @@ gemergt werden — nicht mittendrin. Nachrechnen mit
 
 ## Fallstricke
 
-- `npm run lint` schlägt fehl — ESLint ist im Repo nicht installiert. Beim
-  Aufruf schreibt `expo lint` ungefragt `eslint` + `eslint-config-expo` in die
-  `package.json`, ohne sie zu installieren. Diese Zeilen **nicht** mit
-  committen; entweder ESLint richtig einrichten oder den Aufruf lassen.
+- `npm run lint` (= `expo lint`) **funktioniert** — ESLint ist eingerichtet
+  (`eslint` + `eslint-config-expo` in den devDependencies, Flat-Config in
+  `eslint.config.js`). Nach frischem Checkout `npm install` nicht vergessen.
+  Historischer Fallstrick: Fehlt ESLint, schreibt `expo lint` beim Fehlschlag
+  ungefragt `eslint` + `eslint-config-expo` in die `package.json`, ohne sie zu
+  installieren — so entstandene Zeilen nie committen. Neue Lint-Dev-Deps immer
+  via `npx expo install -- --save-dev <pkg>` (wählt SDK-kompatible Versionen).
 - Typprüfung geht: `npx tsc --noEmit`.
 - Das Web-Backend (`/api/*` auf www.vergabo.de) ist ein **eigenes Repo**
   (`../vergabo`). Änderungen an API-Verträgen immer auf beiden Seiten denken —
