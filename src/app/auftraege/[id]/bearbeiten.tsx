@@ -57,6 +57,9 @@ export default function BewerbungBearbeitenScreen() {
   const [lvPreise, setLvPreise] = useState<LvPreis[]>([])
   const [initialPositionen, setInitialPositionen] = useState<Position[]>([])
   const [positionenVorgegeben, setPositionenVorgegeben] = useState(false)
+  // IDs der AG-Positionen aus der Kostenschätzung — nur diese werden gesperrt,
+  // vom Anbieter selbst ergänzte Positionen bleiben beim Bearbeiten editierbar.
+  const [vorgegebeneIds, setVorgegebeneIds] = useState<string[]>([])
   const [positionen, setPositionen] = useState<Position[]>([])
   const [gesamtpreis, setGesamtpreis] = useState(0)
 
@@ -170,8 +173,12 @@ export default function BewerbungBearbeitenScreen() {
         setPositionen(pos)
         // Ohne GAEB-LV: hat der Auftraggeber eine Kalkulation hinterlegt, sind
         // dessen Positionen (Menge etc.) vorgegeben und gesperrt (wie im Web).
-        const ksPos = (auftrag.kostenschaetzung ?? []) as unknown[]
+        // Gesperrt werden NUR die AG-Positionen — IDs mit demselben Mapping wie
+        // der Seed im Bewerben-Screen (String(p.id ?? i + 1)), damit selbst
+        // ergänzte Positionen editierbar bleiben.
+        const ksPos = (auftrag.kostenschaetzung ?? []) as { id?: string | number }[]
         setPositionenVorgegeben(ksPos.length > 0)
+        setVorgegebeneIds(ksPos.map((p, i) => String(p.id ?? i + 1)))
       }
 
       // Vorhandene Nachweise (Quelle/Pfad) aus der gespeicherten Bewerbung
@@ -404,6 +411,7 @@ export default function BewerbungBearbeitenScreen() {
           initialLvPreise={initialLvPreise}
           initialPositionen={initialPositionen}
           positionenVorgegeben={positionenVorgegeben}
+          vorgegebeneIds={vorgegebeneIds}
           onLvChange={(preise, summe) => {
             setLvPreise(preise)
             setGesamtpreis(summe)

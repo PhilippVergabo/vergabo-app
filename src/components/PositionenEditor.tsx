@@ -17,6 +17,11 @@ type Props = {
   // angelegte Positionen bleiben frei editier- und löschbar. (Spiegel des Web-
   // Verhaltens in components/AngebotPositionen.tsx.)
   positionenVorgegeben?: boolean
+  // Beim BEARBEITEN nötig: initialPositionen sind dort die gespeicherten Positionen
+  // der Bewerbung — inklusive der vom Anbieter selbst ergänzten. Ohne explizite
+  // ID-Liste würden auch diese gesperrt. Hier die IDs der Auftraggeber-Positionen
+  // (aus der Kostenschätzung) übergeben; nur sie werden eingefroren.
+  vorgegebeneIds?: string[]
   onChange: (positionen: Position[], gesamt: number) => void
 }
 
@@ -24,7 +29,12 @@ function summe(positionen: Position[]) {
   return positionen.reduce((s, p) => s + p.gesamt, 0)
 }
 
-export function PositionenEditor({ initialPositionen, positionenVorgegeben = false, onChange }: Props) {
+export function PositionenEditor({
+  initialPositionen,
+  positionenVorgegeben = false,
+  vorgegebeneIds,
+  onChange,
+}: Props) {
   const [positionen, setPositionen] = useState<Position[]>(
     initialPositionen && initialPositionen.length > 0 ? initialPositionen : defaultPositionen,
   )
@@ -32,7 +42,10 @@ export function PositionenEditor({ initialPositionen, positionenVorgegeben = fal
   // später vom Anbieter hinzugefügte Positionen (neue ID) nicht auch als
   // „vorgegeben" gelten.
   const [gesperrteIds] = useState<Set<string>>(
-    () => new Set(positionenVorgegeben ? (initialPositionen ?? []).map((p) => p.id) : []),
+    () =>
+      new Set(
+        positionenVorgegeben ? (vorgegebeneIds ?? (initialPositionen ?? []).map((p) => p.id)) : [],
+      ),
   )
 
   function emit(next: Position[]) {
