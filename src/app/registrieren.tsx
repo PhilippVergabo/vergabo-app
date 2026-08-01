@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { uebersetzeAuthFehler } from '@/lib/authFehler'
 import { AdressAutocomplete } from '@/components/AdressAutocomplete'
+import { PasswortFeld } from '@/components/PasswortFeld'
 import { bundeslandKuerzel } from '@/lib/adressSuche'
 import { fordereCaptchaToken, istCaptchaFehler } from '@/components/Turnstile'
 import { C } from '@/lib/theme'
@@ -227,13 +228,12 @@ export default function RegistrierenScreen() {
               keyboardType="email-address"
               autoComplete="email"
             />
-            <TextInput
+            <PasswortFeld
               style={styles.input}
               placeholder="Passwort wählen"
               placeholderTextColor={C.muted}
               value={password}
               onChangeText={setPassword}
-              secureTextEntry
             />
             {password.length > 0 ? (
               <View style={styles.pwListe}>
