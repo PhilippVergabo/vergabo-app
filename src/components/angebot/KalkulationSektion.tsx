@@ -10,6 +10,10 @@ type Props = {
   /** Nur Bearbeiten-Screen: gespeicherte Einheitspreise vorbefüllen. */
   initialLvPreise?: LvPreis[]
   initialPositionen: Position[]
+  /** true = Positionen stammen vom Auftraggeber → Beschreibung/Menge/Einheit gesperrt. */
+  positionenVorgegeben?: boolean
+  /** Beim Bearbeiten: nur diese IDs sperren (AG-Positionen aus der Kostenschätzung). */
+  vorgegebeneIds?: string[]
   onLvChange: (preise: LvPreis[], summe: number) => void
   onPositionenChange: (positionen: Position[], summe: number) => void
 }
@@ -21,6 +25,8 @@ export function KalkulationSektion({
   lvPositionen,
   initialLvPreise,
   initialPositionen,
+  positionenVorgegeben = false,
+  vorgegebeneIds,
   onLvChange,
   onPositionenChange,
 }: Props) {
@@ -32,7 +38,12 @@ export function KalkulationSektion({
       {hatLv ? (
         <LvEditor positionen={lvPositionen} initialPreise={initialLvPreise} onChange={onLvChange} />
       ) : (
-        <PositionenEditor initialPositionen={initialPositionen} onChange={onPositionenChange} />
+        <PositionenEditor
+          initialPositionen={initialPositionen}
+          positionenVorgegeben={positionenVorgegeben}
+          vorgegebeneIds={vorgegebeneIds}
+          onChange={onPositionenChange}
+        />
       )}
     </View>
   )

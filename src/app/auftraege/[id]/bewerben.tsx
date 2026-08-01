@@ -70,7 +70,7 @@ export default function BewerbenScreen() {
       const { data } = await supabase
         .from('auftraege')
         .select(
-          'status, angebotsfrist, eignungskriterien, verpflichtungserklaerungen, hat_leistungsverzeichnis, leistungsverzeichnis, kostenschaetzung, bindefrist',
+          'status, angebotsfrist, eignungskriterien, verpflichtungserklaerungen, hat_leistungsverzeichnis, leistungsverzeichnis, kostenschaetzung, bindefrist, ausfuehrung_von, ausfuehrung_bis',
         )
         .eq('id', id)
         .single()
@@ -91,6 +91,17 @@ export default function BewerbenScreen() {
       }
 
       if (data.bindefrist) setBindefrist(data.bindefrist as string)
+
+      // Vom Auftraggeber gewünschten Ausführungszeitraum ins Feld vorbelegen —
+      // als echter Wert, nicht nur als Platzhalter (wie im Web; anpassbar bleibt er).
+      const von = data.ausfuehrung_von
+        ? new Date(data.ausfuehrung_von as string).toLocaleDateString('de-DE')
+        : null
+      const bis = data.ausfuehrung_bis
+        ? new Date(data.ausfuehrung_bis as string).toLocaleDateString('de-DE')
+        : null
+      const zeitraum = von && bis ? `${von} – ${bis}` : (von ?? bis ?? null)
+      if (zeitraum) setAusfuehrungszeitraum((prev) => prev || zeitraum)
 
       const kriterien = (data.eignungskriterien ?? []) as Kriterium[]
       const verpfl = (data.verpflichtungserklaerungen ?? []) as { titel: string; text: string }[]
@@ -339,6 +350,7 @@ export default function BewerbenScreen() {
           hatLv={hatLv}
           lvPositionen={lvPositionen}
           initialPositionen={agPositionen}
+          positionenVorgegeben={agPositionen.length > 0}
           onLvChange={(preise, summe) => {
             setLvPreise(preise)
             setGesamtpreis(summe)

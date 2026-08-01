@@ -11,6 +11,17 @@ const defaultPositionen: Position[] = [
 
 type Props = {
   initialPositionen?: Position[]
+  // true, wenn der Auftraggeber die Positionen (Beschreibung/Menge/Einheit) vorgibt:
+  // dann sind GENAU DIESE Felder gesperrt und der Bieter trägt nur den Einzelpreis
+  // ein — sonst wären die Angebote nicht vergleichbar. Zusätzlich vom Anbieter
+  // angelegte Positionen bleiben frei editier- und löschbar. (Spiegel des Web-
+  // Verhaltens in components/AngebotPositionen.tsx.)
+  positionenVorgegeben?: boolean
+  // Beim BEARBEITEN nötig: initialPositionen sind dort die gespeicherten Positionen
+  // der Bewerbung — inklusive der vom Anbieter selbst ergänzten. Ohne explizite
+  // ID-Liste würden auch diese gesperrt. Hier die IDs der Auftraggeber-Positionen
+  // (aus der Kostenschätzung) übergeben; nur sie werden eingefroren.
+  vorgegebeneIds?: string[]
   onChange: (positionen: Position[], gesamt: number) => void
 }
 
@@ -18,9 +29,23 @@ function summe(positionen: Position[]) {
   return positionen.reduce((s, p) => s + p.gesamt, 0)
 }
 
-export function PositionenEditor({ initialPositionen, onChange }: Props) {
+export function PositionenEditor({
+  initialPositionen,
+  positionenVorgegeben = false,
+  vorgegebeneIds,
+  onChange,
+}: Props) {
   const [positionen, setPositionen] = useState<Position[]>(
     initialPositionen && initialPositionen.length > 0 ? initialPositionen : defaultPositionen,
+  )
+  // IDs der vorgegebenen Positionen — einmalig beim Mount eingefroren, damit
+  // später vom Anbieter hinzugefügte Positionen (neue ID) nicht auch als
+  // „vorgegeben" gelten.
+  const [gesperrteIds] = useState<Set<string>>(
+    () =>
+      new Set(
+        positionenVorgegeben ? (vorgegebeneIds ?? (initialPositionen ?? []).map((p) => p.id)) : [],
+      ),
   )
 
   function emit(next: Position[]) {
@@ -83,47 +108,56 @@ export function PositionenEditor({ initialPositionen, onChange }: Props) {
 
   return (
     <View style={{ gap: 12 }}>
-      {positionen.map((p) => (
+      {positionen.map((p) => {
+        const istGesperrt = gesperrteIds.has(p.id)
+        return (
         <View key={p.id} style={styles.row}>
           <View style={styles.rowHead}>
             <TextInput
-              style={styles.beschreibung}
+              style={[styles.beschreibung, istGesperrt && styles.inputGesperrt]}
               value={p.beschreibung}
               placeholder="Beschreibung"
               placeholderTextColor={C.muted}
+              editable={!istGesperrt}
               onChangeText={(t) => updatePosition(p.id, 'beschreibung', t)}
             />
-            <Pressable
-              onPress={() => loeschenMitBestaetigung(p)}
-              hitSlop={8}
-              style={styles.del}
-              accessibilityRole="button"
-              accessibilityLabel="Position löschen"
-            >
-              <Text style={styles.delText}>✕</Text>
-            </Pressable>
+            {!istGesperrt && (
+              <Pressable
+                onPress={() => loeschenMitBestaetigung(p)}
+                hitSlop={8}
+                style={styles.del}
+                accessibilityRole="button"
+                accessibilityLabel="Position löschen"
+              >
+                <Text style={styles.delText}>✕</Text>
+              </Pressable>
+            )}
           </View>
 
           <View style={styles.fieldsRow}>
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>Menge</Text>
               <TextInput
-                style={styles.numInput}
+                style={[styles.numInput, istGesperrt && styles.inputGesperrt]}
                 value={String(p.menge)}
                 keyboardType="decimal-pad"
                 selectTextOnFocus
+                editable={!istGesperrt}
                 onChangeText={(t) => updatePosition(p.id, 'menge', parseFloat(t.replace(',', '.')) || 0)}
               />
             </View>
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>Einheit</Text>
               <Pressable
-                style={styles.einheitBtn}
+                style={[styles.einheitBtn, istGesperrt && styles.inputGesperrt]}
+                disabled={istGesperrt}
                 onPress={() => zyklusEinheit(p.id, p.einheit)}
                 accessibilityRole="button"
-                accessibilityLabel={`Einheit ändern, aktuell ${p.einheit}`}
+                accessibilityLabel={
+                  istGesperrt ? `Einheit ${p.einheit} (vorgegeben)` : `Einheit ändern, aktuell ${p.einheit}`
+                }
               >
-                <Text style={styles.einheitText}>{p.einheit}</Text>
+                <Text style={[styles.einheitText, istGesperrt && styles.einheitTextGesperrt]}>{p.einheit}</Text>
               </Pressable>
             </View>
             <View style={styles.fieldGroup}>
@@ -143,8 +177,16 @@ export function PositionenEditor({ initialPositionen, onChange }: Props) {
             <Text style={styles.gesamtValue}>{fmtPreis(p.gesamt)} €</Text>
           </View>
         </View>
-      ))}
+        )
+      })}
 
+      {positionenVorgegeben && (
+        <Text style={styles.hinweis}>
+          ℹ️ Mengen und Positionen des Auftraggebers sind fest vorgegeben – tragen Sie je Position
+          nur den Einzelpreis ein. Fehlt eine Position (z. B. Baustelleneinrichtung), können Sie
+          sie unten ergänzen.
+        </Text>
+      )}
       <Pressable onPress={hinzufuegen} hitSlop={6} accessibilityRole="button">
         <Text style={styles.add}>+ Weitere Position hinzufügen</Text>
       </Pressable>
@@ -197,6 +239,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   einheitText: { fontSize: 14, color: C.primary, fontWeight: '500' },
+  // Vom Auftraggeber vorgegebene Felder: sichtbar ausgegraut (Spiegel der
+  // disabled:-Optik im Web).
+  inputGesperrt: { backgroundColor: C.field, color: C.muted },
+  einheitTextGesperrt: { color: C.muted, fontWeight: '400' },
+  hinweis: { fontSize: 12, color: C.muted, lineHeight: 17 },
   gesamtRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'baseline', gap: 8 },
   gesamtLabel: { fontSize: 12, color: C.muted },
   gesamtValue: { fontSize: 14, fontWeight: '700', color: C.text },
