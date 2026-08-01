@@ -77,6 +77,10 @@ export default function AuftragDetailScreen() {
   const [nachgereicht, setNachgereicht] = useState<Record<string, boolean>>({})
   const [zieheZurueck, setZieheZurueck] = useState(false)
   const [pdfBusy, setPdfBusy] = useState(false)
+  // Zeitpunkt-Snapshot beim Mount: hält das Render rein (react-hooks/purity),
+  // statt Date.now() während des Renderns aufzurufen. Für die tagesgenaue
+  // Frist-Anzeige ausreichend; aktualisiert bei jedem Daten-Reload ohnehin.
+  const [jetzt] = useState(() => Date.now())
   // Nach Abschluss durch den AG: die eigene erhaltene Bewertung (RLS liefert
   // die Zeile nur für den bewerteten Anbieter — für alle anderen null).
   const [erhalteneBewertung, setErhalteneBewertung] = useState<{
@@ -230,7 +234,11 @@ export default function AuftragDetailScreen() {
       let FileSystemMod: typeof import('expo-file-system')
       let SharingMod: typeof import('expo-sharing')
       try {
+        // Bewusster Lazy-Require (siehe Kommentar oben): statischer Import würde
+        // den nativen Modul-Fehler bereits beim Route-Laden auslösen.
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         FileSystemMod = require('expo-file-system')
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         SharingMod = require('expo-sharing')
       } catch {
         Alert.alert(
@@ -390,7 +398,7 @@ export default function AuftragDetailScreen() {
       {/* Offene Nachforderungen des Auftraggebers zur eigenen Bewerbung */}
       {offeneNachforderungen.map((nf) => {
         const verbleibendeTage = Math.ceil(
-          (new Date(nf.frist).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+          (new Date(nf.frist).getTime() - jetzt) / (1000 * 60 * 60 * 24),
         )
         const dringend = verbleibendeTage <= 2
         const dateien = nfDateien[nf.id] ?? []
@@ -484,7 +492,7 @@ export default function AuftragDetailScreen() {
                         </Text>
                         {erhalteneBewertung.kommentar ? (
                           <Text style={styles.bewertungKommentar}>
-                            „{erhalteneBewertung.kommentar}"
+                            „{erhalteneBewertung.kommentar}“
                           </Text>
                         ) : null}
                       </>
