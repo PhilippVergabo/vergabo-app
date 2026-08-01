@@ -56,6 +56,7 @@ export default function BewerbungBearbeitenScreen() {
   const [initialLvPreise, setInitialLvPreise] = useState<LvPreis[]>([])
   const [lvPreise, setLvPreise] = useState<LvPreis[]>([])
   const [initialPositionen, setInitialPositionen] = useState<Position[]>([])
+  const [positionenVorgegeben, setPositionenVorgegeben] = useState(false)
   const [positionen, setPositionen] = useState<Position[]>([])
   const [gesamtpreis, setGesamtpreis] = useState(0)
 
@@ -81,7 +82,7 @@ export default function BewerbungBearbeitenScreen() {
       const { data: auftrag } = await supabase
         .from('auftraege')
         .select(
-          'eignungskriterien, verpflichtungserklaerungen, status, angebotsfrist, hat_leistungsverzeichnis, leistungsverzeichnis, bindefrist',
+          'eignungskriterien, verpflichtungserklaerungen, status, angebotsfrist, hat_leistungsverzeichnis, leistungsverzeichnis, kostenschaetzung, bindefrist',
         )
         .eq('id', id)
         .single()
@@ -167,6 +168,10 @@ export default function BewerbungBearbeitenScreen() {
         const pos = (bewerbung.positionen ?? []) as Position[]
         setInitialPositionen(pos)
         setPositionen(pos)
+        // Ohne GAEB-LV: hat der Auftraggeber eine Kalkulation hinterlegt, sind
+        // dessen Positionen (Menge etc.) vorgegeben und gesperrt (wie im Web).
+        const ksPos = (auftrag.kostenschaetzung ?? []) as unknown[]
+        setPositionenVorgegeben(ksPos.length > 0)
       }
 
       // Vorhandene Nachweise (Quelle/Pfad) aus der gespeicherten Bewerbung
@@ -398,6 +403,7 @@ export default function BewerbungBearbeitenScreen() {
           lvPositionen={lvPositionen}
           initialLvPreise={initialLvPreise}
           initialPositionen={initialPositionen}
+          positionenVorgegeben={positionenVorgegeben}
           onLvChange={(preise, summe) => {
             setLvPreise(preise)
             setGesamtpreis(summe)
