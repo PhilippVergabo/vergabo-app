@@ -1,4 +1,5 @@
-import { StyleSheet, View } from 'react-native'
+import { useState } from 'react'
+import { Platform, StyleSheet, View } from 'react-native'
 import { WebView } from 'react-native-webview'
 import { C } from '@/lib/theme'
 
@@ -24,17 +25,37 @@ type Props = {
   onExpire: () => void
 }
 
+// Vollständiger Safari-UA: Die Standard-Kennung der WKWebView (ohne
+// „Version/… Safari/…") ist für Cloudflares Umgebungsprüfung ein
+// In-App-Browser-Signal — die Challenge verlangt dann Interaktion und
+// schlägt trotzdem fehl. Mit Safari-UA wird die WebView wie der echte
+// Browser behandelt, in dem das Widget nachweislich läuft.
+const SAFARI_UA =
+  Platform.OS === 'ios'
+    ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1'
+    : undefined
+
 export function Turnstile({ onVerify, onExpire }: Props) {
+  // Grundform 65 px; im interaktiven Modus wächst das Widget — die Seite meldet
+  // ihre tatsächliche Höhe, damit die Challenge nicht abgeschnitten wird.
+  const [hoehe, setHoehe] = useState(71)
+
   if (!CAPTCHA_ENABLED) return null
 
   return (
-    <View style={styles.rahmen}>
+    <View style={[styles.rahmen, { height: Math.min(Math.max(hoehe, 71), 500) }]}>
       <WebView
         source={{ uri: 'https://www.vergabo.de/turnstile-app' }}
+        userAgent={SAFARI_UA}
         onMessage={(e) => {
           try {
-            const msg = JSON.parse(e.nativeEvent.data) as { typ: string; token?: string }
-            if (msg.typ === 'token' && msg.token) onVerify(msg.token)
+            const msg = JSON.parse(e.nativeEvent.data) as {
+              typ: string
+              token?: string
+              hoehe?: number
+            }
+            if (msg.typ === 'hoehe' && typeof msg.hoehe === 'number') setHoehe(msg.hoehe + 6)
+            else if (msg.typ === 'token' && msg.token) onVerify(msg.token)
             else onExpire()
           } catch {
             onExpire()
@@ -54,10 +75,9 @@ export function Turnstile({ onVerify, onExpire }: Props) {
 }
 
 const styles = StyleSheet.create({
-  // Feste Höhe: das Standard-Widget ist 65 px hoch; ohne feste Höhe kollabiert
-  // die WebView in Flex-Layouts auf 0.
+  // Höhe kommt dynamisch von der Seite (min 71, deckelt bei 500); ohne feste
+  // Höhe kollabiert die WebView in Flex-Layouts auf 0.
   rahmen: {
-    height: 71,
     borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
