@@ -1,16 +1,19 @@
-import { useMemo } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { WebView } from 'react-native-webview'
 import { C } from '@/lib/theme'
 
-// Cloudflare Turnstile in einer WebView — Gegenstück zu components/Turnstile.tsx
-// im Web. Der Token wird nativ an die Supabase-Auth-Aufrufe gebunden
+// Cloudflare Turnstile — lädt die gehostete Mini-Seite www.vergabo.de/turnstile-app
+// in einer WebView. Bewusst KEIN HTML-String (loadHTMLString + baseUrl): dabei
+// fehlt der echte Seitenkontext (Cookies/Storage/Navigation) und Cloudflares
+// Challenge hängt dauerhaft bei „Verifiziere…". Auf der echten Seite läuft das
+// Widget in genau der Umgebung, in der es im Web funktioniert; das Ergebnis
+// kommt per postMessage als JSON zurück:
+//   { typ: 'token', token } | { typ: 'expired' } | { typ: 'error' }
+// Protokoll-Gegenstück: vergabo/app/turnstile-app/page.tsx
+//
+// Der Token wird nativ an die Supabase-Auth-Aufrufe gebunden
 // (options.captchaToken); solange der Supabase-Schalter (Auth → Attack
 // Protection) aus ist, ignoriert GoTrue ihn (forward-compatible).
-//
-// baseUrl www.vergabo.de: Turnstile prüft die Hostname-Allowlist des Widgets —
-// die WebView muss sich als erlaubte Domain ausweisen, sonst rendert das Widget
-// einen Domain-Fehler. Es lädt nur das Cloudflare-Script, keine Vergabo-Seite.
 
 export const CAPTCHA_ENABLED = !!process.env.EXPO_PUBLIC_TURNSTILE_SITE_KEY
 
@@ -22,45 +25,12 @@ type Props = {
 }
 
 export function Turnstile({ onVerify, onExpire }: Props) {
-  const html = useMemo(() => {
-    const siteKey = process.env.EXPO_PUBLIC_TURNSTILE_SITE_KEY ?? ''
-    return `<!doctype html>
-<html>
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-  <style>
-    html, body { margin: 0; padding: 0; background: transparent; }
-    #widget { display: flex; justify-content: center; padding-top: 2px; }
-  </style>
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=_onload" async defer></script>
-</head>
-<body>
-  <div id="widget"></div>
-  <script>
-    function _post(msg) {
-      window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(msg));
-    }
-    function _onload() {
-      turnstile.render('#widget', {
-        sitekey: ${JSON.stringify(siteKey)},
-        language: 'de',
-        callback: function (token) { _post({ typ: 'token', token: token }); },
-        'expired-callback': function () { _post({ typ: 'expired' }); },
-        'error-callback': function () { _post({ typ: 'error' }); }
-      });
-    }
-  </script>
-</body>
-</html>`
-  }, [])
-
   if (!CAPTCHA_ENABLED) return null
 
   return (
     <View style={styles.rahmen}>
       <WebView
-        originWhitelist={['https://*']}
-        source={{ html, baseUrl: 'https://www.vergabo.de' }}
+        source={{ uri: 'https://www.vergabo.de/turnstile-app' }}
         onMessage={(e) => {
           try {
             const msg = JSON.parse(e.nativeEvent.data) as { typ: string; token?: string }
@@ -70,6 +40,10 @@ export function Turnstile({ onVerify, onExpire }: Props) {
             onExpire()
           }
         }}
+        // Cookies + DOM-Storage braucht die Challenge für ihre Prüfung.
+        sharedCookiesEnabled
+        thirdPartyCookiesEnabled
+        domStorageEnabled
         style={styles.webview}
         // Kein Scrollen/Zoomen — das Widget ist ein einzelnes Interaktionselement.
         scrollEnabled={false}
