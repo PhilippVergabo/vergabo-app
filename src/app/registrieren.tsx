@@ -17,6 +17,7 @@ import { supabase } from '@/lib/supabase'
 import { uebersetzeAuthFehler } from '@/lib/authFehler'
 import { AdressAutocomplete } from '@/components/AdressAutocomplete'
 import { bundeslandKuerzel } from '@/lib/adressSuche'
+import { CAPTCHA_ENABLED, Turnstile } from '@/components/Turnstile'
 import { C } from '@/lib/theme'
 
 const RECHTSFORMEN = [
@@ -87,6 +88,9 @@ export default function RegistrierenScreen() {
   const [loading, setLoading] = useState(false)
   const [fertig, setFertig] = useState(false)
   const [agb, setAgb] = useState(false)
+  // Turnstile-Token ist einmalig — nach fehlgeschlagenem Versuch frisches Widget.
+  const [captchaToken, setCaptchaToken] = useState('')
+  const [captchaKey, setCaptchaKey] = useState(0)
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -122,7 +126,8 @@ export default function RegistrierenScreen() {
   const schritt1Ok = email.trim().length > 0 && passwordValid(password)
   const schritt2Ok =
     firmenname && inhaberName && rechtsform && steuernummer && strasse && hausnummer && plz && ort
-  const schritt3Ok = gewerke.length > 0 && plz.length > 0 && agb
+  const schritt3Ok =
+    gewerke.length > 0 && plz.length > 0 && agb && (!CAPTCHA_ENABLED || !!captchaToken)
 
   async function handleSubmit() {
     setLoading(true)
@@ -130,6 +135,7 @@ export default function RegistrierenScreen() {
       email: email.trim(),
       password,
       options: {
+        captchaToken: CAPTCHA_ENABLED ? captchaToken : undefined,
         data: {
           rolle: 'anbieter',
           firmenname,
@@ -152,6 +158,11 @@ export default function RegistrierenScreen() {
     setLoading(false)
     if (error) {
       Alert.alert('Registrierung fehlgeschlagen', uebersetzeAuthFehler(error))
+      // Turnstile-Token ist nach dem Versuch verbraucht → frisches Widget.
+      if (CAPTCHA_ENABLED) {
+        setCaptchaToken('')
+        setCaptchaKey((k) => k + 1)
+      }
       return
     }
     // Anti-Enumeration: existiert die E-Mail bereits, gibt Supabase einen User
@@ -331,6 +342,14 @@ export default function RegistrierenScreen() {
                 gelesen und akzeptiere diese.
               </Text>
             </Pressable>
+
+            {CAPTCHA_ENABLED && (
+              <Turnstile
+                key={captchaKey}
+                onVerify={setCaptchaToken}
+                onExpire={() => setCaptchaToken('')}
+              />
+            )}
 
             <View style={styles.zeile}>
               <Pressable style={[styles.secondaryBtn, { flex: 1 }]} onPress={() => setSchritt(2)}>

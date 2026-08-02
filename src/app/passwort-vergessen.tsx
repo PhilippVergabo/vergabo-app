@@ -10,6 +10,7 @@ import {
 } from 'react-native'
 import { Stack, useRouter } from 'expo-router'
 import { supabase } from '@/lib/supabase'
+import { CAPTCHA_ENABLED, Turnstile } from '@/components/Turnstile'
 import { C } from '@/lib/theme'
 
 // Passwort-Reset per E-Mail-Link. Der Link führt auf die Web-Plattform
@@ -21,6 +22,9 @@ export default function PasswortVergessenScreen() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [gesendet, setGesendet] = useState(false)
+  // Turnstile-Token ist einmalig — nach jedem Versuch frisches Widget.
+  const [captchaToken, setCaptchaToken] = useState('')
+  const [captchaKey, setCaptchaKey] = useState(0)
 
   async function handleReset() {
     const mail = email.trim()
@@ -29,10 +33,15 @@ export default function PasswortVergessenScreen() {
 
     await supabase.auth.resetPasswordForEmail(mail, {
       redirectTo: 'https://www.vergabo.de/passwort-reset',
+      captchaToken: CAPTCHA_ENABLED ? captchaToken : undefined,
     })
 
     // Bewusst kein Fehler-Branch nach außen: die Antwort verrät nicht,
     // ob die Adresse registriert ist.
+    if (CAPTCHA_ENABLED) {
+      setCaptchaToken('')
+      setCaptchaKey((k) => k + 1)
+    }
     setLoading(false)
     setGesendet(true)
   }
@@ -89,10 +98,20 @@ export default function PasswortVergessenScreen() {
               textContentType="emailAddress"
               editable={!loading}
             />
+            {CAPTCHA_ENABLED && (
+              <Turnstile
+                key={captchaKey}
+                onVerify={setCaptchaToken}
+                onExpire={() => setCaptchaToken('')}
+              />
+            )}
             <Pressable
-              style={[styles.button, loading && styles.buttonDisabled]}
+              style={[
+                styles.button,
+                (loading || (CAPTCHA_ENABLED && !captchaToken)) && styles.buttonDisabled,
+              ]}
               onPress={handleReset}
-              disabled={loading || !email.trim()}
+              disabled={loading || !email.trim() || (CAPTCHA_ENABLED && !captchaToken)}
               accessibilityRole="button"
               accessibilityState={{ disabled: loading, busy: loading }}
             >
