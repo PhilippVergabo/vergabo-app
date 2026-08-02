@@ -15,6 +15,7 @@ import { createClient } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { uebersetzeAuthFehler } from '@/lib/authFehler'
 import { VergaboLogo } from '@/components/VergaboLogo'
+import { CAPTCHA_ENABLED, Turnstile } from '@/components/Turnstile'
 import { C } from '@/lib/theme'
 
 // Separater, nicht-persistenter Client für den Login-Handshake (Passwort + 2FA):
@@ -43,6 +44,15 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // Turnstile: Token ist einmalig — nach jedem Login-Versuch (auch fehlgeschlagen)
+  // ist er verbraucht; captchaKey erzwingt dann ein frisches Widget.
+  const [captchaToken, setCaptchaToken] = useState('')
+  const [captchaKey, setCaptchaKey] = useState(0)
+  function resetCaptcha() {
+    setCaptchaToken('')
+    setCaptchaKey((k) => k + 1)
+  }
+
   // 2FA-Code-Schritt (nur für Nutzer mit hinterlegtem TOTP-Faktor)
   const [mfaStep, setMfaStep] = useState(false)
   const [factorId, setFactorId] = useState<string | null>(null)
@@ -67,10 +77,15 @@ export default function LoginScreen() {
     setLoading(true)
 
     try {
-      const { data, error } = await loginClient.auth.signInWithPassword({ email, password })
+      const { data, error } = await loginClient.auth.signInWithPassword({
+        email,
+        password,
+        options: { captchaToken: CAPTCHA_ENABLED ? captchaToken : undefined },
+      })
 
       if (error || !data.session) {
         Alert.alert('Anmeldung fehlgeschlagen', uebersetzeAuthFehler(error))
+        if (CAPTCHA_ENABLED) resetCaptcha()
         return
       }
 
@@ -220,10 +235,20 @@ export default function LoginScreen() {
               textContentType="password"
               editable={!loading}
             />
+            {CAPTCHA_ENABLED && (
+              <Turnstile
+                key={captchaKey}
+                onVerify={setCaptchaToken}
+                onExpire={() => setCaptchaToken('')}
+              />
+            )}
             <Pressable
-              style={[styles.button, loading && styles.buttonDisabled]}
+              style={[
+                styles.button,
+                (loading || (CAPTCHA_ENABLED && !captchaToken)) && styles.buttonDisabled,
+              ]}
               onPress={handleLogin}
-              disabled={loading}
+              disabled={loading || (CAPTCHA_ENABLED && !captchaToken)}
               accessibilityRole="button"
               accessibilityState={{ disabled: loading, busy: loading }}
             >

@@ -17,6 +17,7 @@ import { supabase } from '@/lib/supabase'
 import { uebersetzeAuthFehler } from '@/lib/authFehler'
 import { AdressAutocomplete } from '@/components/AdressAutocomplete'
 import { bundeslandKuerzel } from '@/lib/adressSuche'
+import { CAPTCHA_ENABLED, Turnstile } from '@/components/Turnstile'
 import { C } from '@/lib/theme'
 
 const ORG_TYPEN = [
@@ -66,6 +67,9 @@ export default function RegistrierenAuftraggeber() {
   const [fertig, setFertig] = useState(false)
   const [agb, setAgb] = useState(false)
   const [avv, setAvv] = useState(false)
+  // Turnstile-Token ist einmalig — nach fehlgeschlagenem Versuch frisches Widget.
+  const [captchaToken, setCaptchaToken] = useState('')
+  const [captchaKey, setCaptchaKey] = useState(0)
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -91,7 +95,8 @@ export default function RegistrierenAuftraggeber() {
 
   const schritt1Ok = email.trim().length > 0 && passwordValid(password)
   const schritt2Ok = organisationName && organisationTyp && ansprechpartner
-  const schritt3Ok = plz.length > 0 && ort.length > 0 && agb && avv
+  const schritt3Ok =
+    plz.length > 0 && ort.length > 0 && agb && avv && (!CAPTCHA_ENABLED || !!captchaToken)
 
   async function handleSubmit() {
     setLoading(true)
@@ -99,6 +104,7 @@ export default function RegistrierenAuftraggeber() {
       email: email.trim(),
       password,
       options: {
+        captchaToken: CAPTCHA_ENABLED ? captchaToken : undefined,
         data: {
           rolle: 'auftraggeber',
           organisation_name: organisationName,
@@ -116,6 +122,11 @@ export default function RegistrierenAuftraggeber() {
     setLoading(false)
     if (error) {
       Alert.alert('Registrierung fehlgeschlagen', uebersetzeAuthFehler(error))
+      // Turnstile-Token ist nach dem Versuch verbraucht → frisches Widget.
+      if (CAPTCHA_ENABLED) {
+        setCaptchaToken('')
+        setCaptchaKey((k) => k + 1)
+      }
       return
     }
     if (data.user && (data.user.identities?.length ?? 0) === 0) {
@@ -305,6 +316,14 @@ export default function RegistrierenAuftraggeber() {
                 gemäß Art. 28 DSGVO.
               </Text>
             </Pressable>
+
+            {CAPTCHA_ENABLED && (
+              <Turnstile
+                key={captchaKey}
+                onVerify={setCaptchaToken}
+                onExpire={() => setCaptchaToken('')}
+              />
+            )}
 
             <View style={styles.zeile}>
               <Pressable style={[styles.secondaryBtn, { flex: 1 }]} onPress={() => setSchritt(2)}>
