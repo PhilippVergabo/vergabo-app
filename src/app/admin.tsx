@@ -18,7 +18,7 @@ import { registriereAdminPush } from '@/lib/push'
 import { GEWERK_LABELS } from '@/lib/labels'
 import { C } from '@/lib/theme'
 import { AdminKarte, type AdminEintrag, type Tab } from '@/components/admin/AdminKarte'
-import { type AdminDokument } from '@/components/admin/NachweisBadge'
+import { zaehleOffeneNachweise, type AdminDokument } from '@/components/admin/NachweisBadge'
 
 type AdminAnbieter = {
   id: string
@@ -28,6 +28,8 @@ type AdminAnbieter = {
   plz: string | null
   gewerke: string[] | null
   verifiziert: boolean
+  /** Optional: ältere Backend-Stände liefern das Feld noch nicht → 0. */
+  offene_nachweise?: number
 }
 
 type AdminAuftraggeber = {
@@ -77,6 +79,7 @@ const TAB_CONFIG: Record<
         zeilen: [a.inhaber_name ?? '', [a.plz, a.ort].filter(Boolean).join(' ')].filter(Boolean),
         akzent: (a.gewerke ?? []).map((g) => GEWERK_LABELS[g] ?? g).join(', '),
         verifiziert: a.verifiziert,
+        offeneNachweise: a.offene_nachweise ?? 0,
       })),
   },
   auftraggeber: {
@@ -101,6 +104,8 @@ const TAB_CONFIG: Record<
         ].filter(Boolean),
         akzent: '',
         verifiziert: a.verifiziert,
+        // Nachweise gibt es nur bei Anbietern.
+        offeneNachweise: 0,
       })),
   },
 }
@@ -379,6 +384,12 @@ export default function AdminScreen() {
   const konfig = TAB_CONFIG[tab]
   const liste = eintraege[tab] ?? []
   const offen = liste.filter((e) => !e.verifiziert).length
+  // Gesamtzahl zu prüfender Nachweise über alle Anbieter — bereits geladene
+  // Listen zählen aus dem Cache, damit der Wert nach Entscheidungen mitläuft.
+  const offeneNachweiseGesamt = liste.reduce((summe, e) => {
+    const geladen = nachweise[e.id]
+    return summe + (geladen ? zaehleOffeneNachweise(geladen) : e.offeneNachweise)
+  }, 0)
   return (
     <View style={styles.container}>
       <View style={styles.segment}>
@@ -404,15 +415,24 @@ export default function AdminScreen() {
         ListHeaderComponent={
           <Text style={styles.summary}>
             {liste.length} {konfig.einheit} · {offen} offen
+            {offeneNachweiseGesamt > 0 ? ` · ${offeneNachweiseGesamt} Nachweise zu prüfen` : ''}
           </Text>
         }
         ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-        renderItem={({ item }) => (
+        renderItem={({ item }) => {
+          // Sind die Nachweise bereits geladen, gilt der daraus berechnete Stand:
+          // so zählt der Hinweis nach einer Freigabe/Ablehnung sofort herunter,
+          // statt bis zum nächsten Neuladen der Liste stehenzubleiben.
+          const geladen = nachweise[item.id]
+          const offeneNachweise = geladen ? zaehleOffeneNachweise(geladen) : item.offeneNachweise
+
+          return (
           <AdminKarte
             item={item}
             tab={tab}
             busy={busyId === item.id}
             onSetVerifiziert={(verifizieren) => setVerifiziert(tab, item, verifizieren)}
+            offeneNachweise={offeneNachweise}
             nachweisDokumente={nachweise[item.id] ?? null}
             nachweisOffen={!!nachweiseOffen[item.id]}
             nachweisLaedt={nachweiseLadenId === item.id}
@@ -420,7 +440,8 @@ export default function AdminScreen() {
             nachweisBusyDokId={nachweisBusyDokId}
             onNachweisEntscheiden={(dok, aktion) => entscheideNachweis(item.id, dok, aktion)}
           />
-        )}
+          )
+        }}
         ListEmptyComponent={
           <View style={{ paddingTop: 64, alignItems: 'center' }}>
             <Text style={styles.muted}>{ladenListe ? 'Wird geladen …' : konfig.leerText}</Text>
