@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router'
 import { createClient } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { uebersetzeAuthFehler } from '@/lib/authFehler'
+import { PasswortFeld } from '@/components/PasswortFeld'
 import { VergaboLogo } from '@/components/VergaboLogo'
 import { fordereCaptchaToken, istCaptchaFehler } from '@/components/Turnstile'
 import { C } from '@/lib/theme'
@@ -225,13 +226,12 @@ export default function LoginScreen() {
               textContentType="emailAddress"
               editable={!loading}
             />
-            <TextInput
+            <PasswortFeld
               style={styles.input}
               placeholder="Passwort"
               placeholderTextColor={C.muted}
               value={password}
               onChangeText={setPassword}
-              secureTextEntry
               autoComplete="current-password"
               textContentType="password"
               editable={!loading}
