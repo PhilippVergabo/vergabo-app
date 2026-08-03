@@ -7,6 +7,8 @@ import { NachweisBadge, type AdminDokument } from './NachweisBadge'
 type Props = {
   /** Anbieter-Name — nur für das Accessibility-Label des Toggles. */
   titel: string
+  /** Anzahl noch zu prüfender Nachweise (0 = nichts zu tun). */
+  offeneNachweise: number
   /** null = für diesen Anbieter noch nicht geladen (Lazy-Load beim ersten Öffnen). */
   dokumente: AdminDokument[] | null
   offen: boolean
@@ -21,6 +23,7 @@ type Props = {
 // 1:1 aus admin.tsx verschoben; Laden/Cachen + API-Aufrufe bleiben im Screen.
 export function NachweisListe({
   titel,
+  offeneNachweise,
   dokumente,
   offen,
   laedt,
@@ -28,6 +31,15 @@ export function NachweisListe({
   busyDokId,
   onEntscheiden,
 }: Props) {
+  // Im eingeklappten Zustand die Zahl direkt am Toggle nennen — so ist beim
+  // Scrollen erkennbar, wo etwas zu tun ist, ohne jede Karte aufzuklappen.
+  const zusatz =
+    !offen && offeneNachweise > 0
+      ? offeneNachweise === 1
+        ? ' — 1 zu prüfen'
+        : ` — ${offeneNachweise} zu prüfen`
+      : ''
+
   return (
     <View style={styles.nachweisBereich}>
       <Pressable
@@ -35,8 +47,8 @@ export function NachweisListe({
         accessibilityRole="button"
         accessibilityLabel={`Nachweise von ${titel} ${offen ? 'ausblenden' : 'anzeigen'}`}
       >
-        <Text style={styles.nachweisToggle}>
-          {offen ? '▾ Nachweise ausblenden' : '▸ Nachweise anzeigen'}
+        <Text style={[styles.nachweisToggle, !offen && offeneNachweise > 0 && styles.nachweisToggleTodo]}>
+          {offen ? '▾ Nachweise ausblenden' : `▸ Nachweise anzeigen${zusatz}`}
         </Text>
       </Pressable>
       {offen ? (
@@ -107,6 +119,7 @@ export function NachweisListe({
 const styles = StyleSheet.create({
   nachweisBereich: { marginTop: 8, borderTopWidth: 1, borderTopColor: C.border, paddingTop: 10 },
   nachweisToggle: { fontSize: 13, fontWeight: '600', color: C.primary },
+  nachweisToggleTodo: { color: C.accent },
   meta: { fontSize: 13, color: C.muted },
   dokEintrag: {
     marginTop: 10,

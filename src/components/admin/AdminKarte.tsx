@@ -13,6 +13,8 @@ export type AdminEintrag = {
   zeilen: string[] // gedämpfte Meta-Zeilen (Person, PLZ + Ort)
   akzent: string // Akzent-Zeile (Gewerke bzw. Organisationstyp)
   verifiziert: boolean
+  /** Vom Server gemeldete Zahl noch zu prüfender Nachweise (0 = nichts zu tun). */
+  offeneNachweise: number
 }
 
 type Props = {
@@ -20,6 +22,12 @@ type Props = {
   tab: Tab
   busy: boolean
   onSetVerifiziert: (verifizieren: boolean) => void
+  /**
+   * Zu prüfende Nachweise für die Anzeige — sobald die Liste geladen ist, aus
+   * den geladenen Dokumenten berechnet, damit der Hinweis nach einer
+   * Freigabe/Ablehnung sofort mitzählt statt bis zum Neuladen stehenzubleiben.
+   */
+  offeneNachweise: number
   /** Nachweise (nur tab === 'anbieter'); null = noch nicht geladen. */
   nachweisDokumente: AdminDokument[] | null
   nachweisOffen: boolean
@@ -37,6 +45,7 @@ export function AdminKarte({
   tab,
   busy,
   onSetVerifiziert,
+  offeneNachweise,
   nachweisDokumente,
   nachweisOffen,
   nachweisLaedt,
@@ -50,15 +59,34 @@ export function AdminKarte({
         <Text style={styles.titel} numberOfLines={2}>
           {item.titel}
         </Text>
-        {item.verifiziert ? (
-          <View style={[styles.badge, styles.badgeOk]}>
-            <Text style={styles.badgeOkText}>✓ Verifiziert</Text>
-          </View>
-        ) : (
-          <View style={[styles.badge, styles.badgeWarn]}>
-            <Text style={styles.badgeWarnText}>Offen</Text>
-          </View>
-        )}
+        <View style={styles.badgeSpalte}>
+          {item.verifiziert ? (
+            <View style={[styles.badge, styles.badgeOk]}>
+              <Text style={styles.badgeOkText}>✓ Verifiziert</Text>
+            </View>
+          ) : (
+            <View style={[styles.badge, styles.badgeWarn]}>
+              <Text style={styles.badgeWarnText}>Offen</Text>
+            </View>
+          )}
+          {/* Handlungsbedarf schon an der eingeklappten Karte sichtbar machen.
+              Unabhängig von „Verifiziert": ein bereits verifizierter Anbieter
+              kann später Nachweise nachreichen, die noch zu prüfen sind. */}
+          {tab === 'anbieter' && offeneNachweise > 0 ? (
+            <View
+              style={[styles.badge, styles.badgeTodo]}
+              accessibilityLabel={
+                offeneNachweise === 1
+                  ? '1 Nachweis zu prüfen'
+                  : `${offeneNachweise} Nachweise zu prüfen`
+              }
+            >
+              <Text style={styles.badgeTodoText}>
+                ⏳ {offeneNachweise} zu prüfen
+              </Text>
+            </View>
+          ) : null}
+        </View>
       </View>
       {item.zeilen.map((zeile, i) => (
         <Text key={i} style={styles.meta}>
@@ -70,6 +98,7 @@ export function AdminKarte({
       {tab === 'anbieter' ? (
         <NachweisListe
           titel={item.titel}
+          offeneNachweise={offeneNachweise}
           dokumente={nachweisDokumente}
           offen={nachweisOffen}
           laedt={nachweisLaedt}
@@ -127,11 +156,16 @@ const styles = StyleSheet.create({
   },
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
   titel: { fontSize: 16, fontWeight: '600', color: C.text, flex: 1 },
+  badgeSpalte: { alignItems: 'flex-end', gap: 4 },
   badge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   badgeOk: { backgroundColor: C.ok },
   badgeOkText: { fontSize: 11, fontWeight: '700', color: C.primary },
   badgeWarn: { backgroundColor: '#fdf3ea' },
   badgeWarnText: { fontSize: 11, fontWeight: '700', color: C.accent },
+  // Gefüllt statt nur getönt: der Handlungsbedarf soll beim Scrollen auffallen
+  // und sich klar vom reinen Status-Badge darüber abheben.
+  badgeTodo: { backgroundColor: C.accent },
+  badgeTodoText: { fontSize: 11, fontWeight: '700', color: '#ffffff' },
   meta: { fontSize: 13, color: C.muted },
   metaAkzent: { fontSize: 13, color: C.accent, fontWeight: '500' },
   btnDisabled: { opacity: 0.5 },

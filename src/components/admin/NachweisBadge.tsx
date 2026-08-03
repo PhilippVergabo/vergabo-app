@@ -13,6 +13,26 @@ export type AdminDokument = {
   url: string | null
 }
 
+/**
+ * Wartet dieser Nachweis auf eine Admin-Entscheidung („⏳ in Prüfung")?
+ *
+ * Genau die Bedingung, unter der NachweisBadge unten in den letzten Zweig
+ * fällt — hier ausgelagert, damit die Zählung am Karten-Kopf und das Badge in
+ * der Liste nicht auseinanderlaufen können.
+ *
+ * „fehlt" (weder bestätigt noch Datei hinterlegt) zählt bewusst NICHT: daran
+ * gibt es für den Admin nichts zu entscheiden, der Anbieter muss erst liefern.
+ */
+export function istOffenerNachweis(d: AdminDokument): boolean {
+  if (!d.bestaetigt && !d.dateiname) return false
+  return !d.admin_verifiziert && !d.admin_abgelehnt
+}
+
+/** Anzahl der auf eine Entscheidung wartenden Nachweise. */
+export function zaehleOffeneNachweise(dokumente: AdminDokument[]): number {
+  return dokumente.filter(istOffenerNachweis).length
+}
+
 // Status-Logik wie StatusBadge in eigenerklarungen.tsx (Anbieter-Sicht),
 // damit Admin und Anbieter denselben Zustand sehen.
 export function NachweisBadge({ d }: { d: AdminDokument }) {
