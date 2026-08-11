@@ -181,6 +181,11 @@ export default function LoginScreen() {
               placeholder="000000"
               placeholderTextColor={C.muted}
               keyboardType="number-pad"
+              // Ohne diese beiden Angaben bietet iOS über der Tastatur keinen
+              // Verifizierungscode an — das Feld muss sich als Einmalcode zu
+              // erkennen geben.
+              textContentType="oneTimeCode"
+              autoComplete="one-time-code"
               maxLength={6}
               autoFocus
               editable={!mfaBusy}

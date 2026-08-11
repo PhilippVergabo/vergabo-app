@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
 import { supabase } from '@/lib/supabase'
+import { abmelden } from '@/lib/auth'
 import { AnbieterHome } from '@/components/AnbieterHome'
 import { AuftraggeberHome } from '@/components/AuftraggeberHome'
 import { C } from '@/lib/theme'
@@ -43,7 +44,7 @@ export default function HomeScreen() {
       <Text style={styles.text}>
         Diese App ist für Anbieter und Auftraggeber. Bitte nutze die Web-Plattform unter vergabo.de.
       </Text>
-      <Pressable style={styles.button} onPress={() => supabase.auth.signOut()}>
+      <Pressable style={styles.button} onPress={() => void abmelden()}>
         <Text style={styles.buttonText}>Abmelden</Text>
       </Pressable>
     </View>
