@@ -32,8 +32,12 @@ function formatDate(iso: string | null) {
   return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
+// Zeitstempel beim Laden des Moduls (stabil, kein Date.now() im Render) —
+// Referenz für „Frist abgelaufen" im Status-Badge.
+const LADE_MS = new Date().getTime()
+
 function AuftraggeberKarte({ auftrag, anzahl }: { auftrag: AGAuftrag; anzahl: number }) {
-  const status = auftragStatusStil(auftrag.status)
+  const status = auftragStatusStil(auftrag.status, auftrag.angebotsfrist, LADE_MS)
   const frist = formatDate(auftrag.angebotsfrist)
   const meta = [auftrag.gewerk ? gewerkLabel(auftrag.gewerk) : null, auftrag.ausfuehrungsort_ort]
     .filter(Boolean)

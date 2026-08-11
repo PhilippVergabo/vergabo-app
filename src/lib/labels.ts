@@ -46,6 +46,23 @@ export const AUFTRAG_STATUS: Record<string, AuftragStatusStil> = {
 
 // Status → Stil; unbekannte Status erhalten den neutralen Entwurf-Stil mit
 // dem rohen Status als Label (Verhalten wie zuvor in AuftraggeberHome).
-export function auftragStatusStil(status: string): AuftragStatusStil {
+//
+// Optional mit Angebotsfrist + stabilem Zeitstempel: Der DB-Status bleibt bis
+// zum Zuschlag `veroeffentlicht` — nach Fristablauf ist „Veröffentlicht" für
+// den Auftraggeber aber irreführend (Anbieter sehen den Auftrag nicht mehr).
+// Dann: „Frist abgelaufen" in Warn-Optik (Spiegel von lib/statusLabels.ts im Web).
+export function auftragStatusStil(
+  status: string,
+  angebotsfrist?: string | null,
+  jetztMs?: number,
+): AuftragStatusStil {
+  if (
+    status === 'veroeffentlicht' &&
+    angebotsfrist &&
+    jetztMs != null &&
+    new Date(angebotsfrist).getTime() < jetztMs
+  ) {
+    return { label: 'Frist abgelaufen', bg: '#fdf3ea', fg: '#8a4a1e' }
+  }
   return AUFTRAG_STATUS[status] ?? { label: status, bg: '#ece8df', fg: '#6b6b60' }
 }
