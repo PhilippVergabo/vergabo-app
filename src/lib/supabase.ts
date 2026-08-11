@@ -19,9 +19,17 @@ const noopStorage = {
   removeItem: async () => undefined,
 }
 
+// Schlüssel, unter dem supabase-js die Sitzung ablegt. Bewusst explizit gesetzt
+// statt sich auf die Ableitung der Bibliothek zu verlassen: Der Offline-Fallback
+// beim Abmelden (lib/auth.ts) muss genau diesen Eintrag entfernen können.
+// Die Formel ist identisch zur Bibliotheks-Vorgabe (`sb-<ref>-auth-token`) —
+// bestehende Sitzungen bleiben dadurch gültig.
+export const SUPABASE_STORAGE_KEY = `sb-${new URL(supabaseUrl).hostname.split('.')[0]}-auth-token`
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: istWebSSR ? noopStorage : AsyncStorage,
+    storageKey: SUPABASE_STORAGE_KEY,
     autoRefreshToken: !istWebSSR,
     persistSession: !istWebSSR,
     detectSessionInUrl: false,

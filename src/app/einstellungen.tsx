@@ -12,7 +12,7 @@ import Constants from 'expo-constants'
 import { useRouter, type Href } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { authedFetch } from '@/lib/authedFetch'
-import { abmeldenMitBestaetigung } from '@/lib/auth'
+import { abmelden, abmeldenMitBestaetigung } from '@/lib/auth'
 import { C } from '@/lib/theme'
 
 // Einstellungen: Konto-Infos, Abmelden, rechtliche Links, App-Version und
@@ -53,7 +53,9 @@ export default function EinstellungenScreen() {
         Alert.alert('Löschung fehlgeschlagen', meldung)
         return
       }
-      await supabase.auth.signOut()
+      // Gleicher robuster Weg wie beim normalen Abmelden: Das Konto ist bereits
+      // gelöscht — die Sitzung darf auf keinen Fall auf dem Gerät zurückbleiben.
+      await abmelden()
       Alert.alert(
         'Konto gelöscht',
         'Ihr Konto wurde gelöscht. Daten laufender Vergaben bleiben aus rechtlichen Gründen für die Dauer der Aufbewahrungsfristen gespeichert.',

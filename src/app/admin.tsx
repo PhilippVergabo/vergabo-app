@@ -364,6 +364,9 @@ export default function AdminScreen() {
             placeholder="000000"
             placeholderTextColor={C.muted}
             keyboardType="number-pad"
+            // Wie im Login-2FA-Schritt: erst damit bietet iOS den Code an.
+            textContentType="oneTimeCode"
+            autoComplete="one-time-code"
             maxLength={6}
             autoFocus
           />
