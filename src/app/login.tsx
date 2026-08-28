@@ -16,7 +16,7 @@ import { supabase } from '@/lib/supabase'
 import { uebersetzeAuthFehler } from '@/lib/authFehler'
 import { PasswortFeld } from '@/components/PasswortFeld'
 import { VergaboLogo } from '@/components/VergaboLogo'
-import { fordereCaptchaToken, istCaptchaFehler } from '@/components/Turnstile'
+import { captchaFehlerText, fordereCaptchaToken, istCaptchaFehler } from '@/components/Turnstile'
 import { C } from '@/lib/theme'
 
 // Separater, nicht-persistenter Client für den Login-Handshake (Passwort + 2FA):
@@ -68,21 +68,30 @@ export default function LoginScreen() {
     if (!email || !password) return
     setLoading(true)
 
+    // Wie im Web-Login (app/api/auth/login): Leerzeichen und Groß-/Kleinschreibung
+    // normalisieren. Ein vom Tippen oder Ausfüllen angehängtes Leerzeichen führte
+    // sonst serverseitig zu „Invalid login credentials" — also zur Meldung
+    // „falsches Passwort", obwohl das Passwort stimmt.
+    const emailNormalisiert = email.trim().toLowerCase()
+
     try {
-      let { data, error } = await loginClient.auth.signInWithPassword({ email, password })
+      let { data, error } = await loginClient.auth.signInWithPassword({
+        email: emailNormalisiert,
+        password,
+      })
 
       // CAPTCHA-Zwischenschritt nur, wenn Supabase ihn verlangt: Safari-Fenster
       // öffnen, Token holen, Aufruf einmal wiederholen.
       if (istCaptchaFehler(error)) {
-        const token = await fordereCaptchaToken()
-        if (!token) {
-          Alert.alert('Anmeldung fehlgeschlagen', 'Die Sicherheitsprüfung wurde abgebrochen.')
+        const captcha = await fordereCaptchaToken()
+        if (!captcha.ok) {
+          Alert.alert('Anmeldung fehlgeschlagen', captchaFehlerText(captcha.grund))
           return
         }
         ;({ data, error } = await loginClient.auth.signInWithPassword({
-          email,
+          email: emailNormalisiert,
           password,
-          options: { captchaToken: token },
+          options: { captchaToken: captcha.token },
         }))
       }
 

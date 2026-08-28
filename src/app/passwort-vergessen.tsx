@@ -34,12 +34,12 @@ export default function PasswortVergessenScreen() {
     // CAPTCHA-Zwischenschritt nur, wenn Supabase ihn verlangt. Bricht der
     // Nutzer ab, KEINE Erfolgsmeldung zeigen — es wurde ja nichts gesendet.
     if (istCaptchaFehler(error)) {
-      const token = await fordereCaptchaToken()
-      if (!token) {
+      const captcha = await fordereCaptchaToken()
+      if (!captcha.ok) {
         setLoading(false)
         return
       }
-      await supabase.auth.resetPasswordForEmail(mail, { redirectTo, captchaToken: token })
+      await supabase.auth.resetPasswordForEmail(mail, { redirectTo, captchaToken: captcha.token })
     }
 
     // Sonst bewusst kein Fehler-Branch nach außen: die Antwort verrät nicht,

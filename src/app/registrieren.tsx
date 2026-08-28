@@ -18,7 +18,7 @@ import { uebersetzeAuthFehler } from '@/lib/authFehler'
 import { AdressAutocomplete } from '@/components/AdressAutocomplete'
 import { PasswortFeld } from '@/components/PasswortFeld'
 import { bundeslandKuerzel } from '@/lib/adressSuche'
-import { fordereCaptchaToken, istCaptchaFehler } from '@/components/Turnstile'
+import { captchaFehlerText, fordereCaptchaToken, istCaptchaFehler } from '@/components/Turnstile'
 import { C } from '@/lib/theme'
 
 const RECHTSFORMEN = [
@@ -158,13 +158,13 @@ export default function RegistrierenScreen() {
 
     let { data, error } = await anmelden()
     if (istCaptchaFehler(error)) {
-      const token = await fordereCaptchaToken()
-      if (!token) {
+      const captcha = await fordereCaptchaToken()
+      if (!captcha.ok) {
         setLoading(false)
-        Alert.alert('Registrierung abgebrochen', 'Die Sicherheitsprüfung wurde abgebrochen.')
+        Alert.alert('Registrierung abgebrochen', captchaFehlerText(captcha.grund))
         return
       }
-      ;({ data, error } = await anmelden(token))
+      ;({ data, error } = await anmelden(captcha.token))
     }
     setLoading(false)
     if (error) {
