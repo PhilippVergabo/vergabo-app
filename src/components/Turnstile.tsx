@@ -1,3 +1,4 @@
+import * as Linking from 'expo-linking'
 import * as WebBrowser from 'expo-web-browser'
 
 // Cloudflare Turnstile als Bedarfs-Zwischenschritt (kein sichtbares Widget):
@@ -25,6 +26,9 @@ import * as WebBrowser from 'expo-web-browser'
  */
 const CAPTCHA_TIMEOUT_MS = 90_000
 
+const PRUEF_URL = 'https://www.vergabo.de/turnstile-app?app=1'
+const RUECKSPRUNG = 'vergaboapp://turnstile'
+
 /** Verhindert zwei gleichzeitige Safari-Sessions (die zweite bliebe hängen). */
 let laeuftBereits = false
 
@@ -49,6 +53,35 @@ export function istCaptchaFehler(error: { message?: string } | null | undefined)
 }
 
 /**
+ * Wie der Rücksprung bei uns ankommt.
+ *
+ * 'session'  — Regelfall: Das Auth-Fenster fängt vergaboapp://turnstile selbst
+ *              ab und liefert die URL als Ergebnis zurück.
+ * 'deeplink' — Beobachtet auf iOS 26: Der Rücksprung wird stattdessen an die
+ *              App durchgereicht. Das Auth-Fenster meldet dann NIE ein Ergebnis
+ *              — ohne diesen zweiten Weg wartete der Login-Screen endlos, und
+ *              expo-router zeigte „Unmatched Route".
+ * 'timeout'  — Nichts von beidem kam an (siehe CAPTCHA_TIMEOUT_MS).
+ */
+type RennErgebnis =
+  | { art: 'session'; wert: WebBrowser.WebBrowserAuthSessionResult }
+  | { art: 'deeplink'; token: string }
+  | { art: 'timeout' }
+
+function tokenAusUrl(url: string): string | null {
+  const roh = url.match(/[?&]token=([^&#]+)/)?.[1]
+  return roh ? decodeURIComponent(roh) : null
+}
+
+function schliesseFenster() {
+  try {
+    WebBrowser.dismissAuthSession()
+  } catch {
+    // Kein Fenster mehr offen — nicht kritisch.
+  }
+}
+
+/**
  * Öffnet die Sicherheitsprüfung im Safari-Fenster und liefert den Token.
  * Löst IMMER auf — notfalls per Zeitgrenze (siehe CAPTCHA_TIMEOUT_MS).
  * Token ist einmalig, ~300 s gültig.
@@ -58,36 +91,48 @@ export async function fordereCaptchaToken(): Promise<CaptchaErgebnis> {
   laeuftBereits = true
 
   let timer: ReturnType<typeof setTimeout> | undefined
+  let abo: ReturnType<typeof Linking.addEventListener> | undefined
+
   try {
-    const ergebnis = await Promise.race([
-      WebBrowser.openAuthSessionAsync(
-        'https://www.vergabo.de/turnstile-app?app=1',
-        'vergaboapp://turnstile',
+    const ergebnis = await Promise.race<RennErgebnis>([
+      WebBrowser.openAuthSessionAsync(PRUEF_URL, RUECKSPRUNG).then(
+        (wert) => ({ art: 'session', wert }) as const,
       ),
-      new Promise<'timeout'>((resolve) => {
-        timer = setTimeout(() => resolve('timeout'), CAPTCHA_TIMEOUT_MS)
+      // Zweiter Weg (siehe RennErgebnis): Der Rücksprung erreicht die App als
+      // normaler Deeplink, statt vom Auth-Fenster abgefangen zu werden.
+      new Promise<RennErgebnis>((resolve) => {
+        abo = Linking.addEventListener('url', ({ url }) => {
+          if (!url.startsWith(RUECKSPRUNG)) return
+          const token = tokenAusUrl(url)
+          if (token) resolve({ art: 'deeplink', token })
+        })
+      }),
+      new Promise<RennErgebnis>((resolve) => {
+        timer = setTimeout(() => resolve({ art: 'timeout' }), CAPTCHA_TIMEOUT_MS)
       }),
     ])
 
-    if (ergebnis === 'timeout') {
-      // Fenster aktiv schließen, sonst bliebe es über dem Formular stehen.
-      try {
-        WebBrowser.dismissAuthSession()
-      } catch {
-        // Kein Fenster mehr offen — nicht kritisch.
-      }
+    if (ergebnis.art === 'timeout') {
+      schliesseFenster()
       return { ok: false, grund: 'zeitueberschreitung' }
     }
 
-    if (ergebnis.type !== 'success') return { ok: false, grund: 'abgebrochen' }
+    if (ergebnis.art === 'deeplink') {
+      // Das Safari-Fenster bleibt in diesem Fall offen — selbst schließen.
+      schliesseFenster()
+      return { ok: true, token: ergebnis.token }
+    }
 
-    const roh = ergebnis.url.match(/[?&]token=([^&#]+)/)?.[1]
-    if (!roh) return { ok: false, grund: 'fehler' }
-    return { ok: true, token: decodeURIComponent(roh) }
+    if (ergebnis.wert.type !== 'success') return { ok: false, grund: 'abgebrochen' }
+
+    const token = tokenAusUrl(ergebnis.wert.url)
+    if (!token) return { ok: false, grund: 'fehler' }
+    return { ok: true, token }
   } catch {
     return { ok: false, grund: 'fehler' }
   } finally {
     if (timer) clearTimeout(timer)
+    abo?.remove()
     laeuftBereits = false
   }
 }
