@@ -14,9 +14,10 @@ import { useRouter } from 'expo-router'
 import { createClient } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { uebersetzeAuthFehler } from '@/lib/authFehler'
+import { API_URL } from '@/lib/config'
 import { PasswortFeld } from '@/components/PasswortFeld'
 import { VergaboLogo } from '@/components/VergaboLogo'
-import { captchaFehlerText, fordereCaptchaToken, istCaptchaFehler } from '@/components/Turnstile'
+import { captchaFehlerText, fordereCaptchaToken } from '@/components/Turnstile'
 import { C } from '@/lib/theme'
 
 // Separater, nicht-persistenter Client für den Login-Handshake (Passwort + 2FA):
@@ -38,6 +39,21 @@ const loginClient = createClient(
     },
   },
 )
+
+// Fehlercodes der Backend-Route in verständliche Meldungen übersetzen.
+// Die Codes spiegeln app/api/app-auth/login im Web-Repo.
+function loginFehlerText(inhalt: { error?: string; resetIn?: number }): string {
+  if (inhalt.error === 'rate_limited') {
+    const minuten = inhalt.resetIn ?? 15
+    return `Zu viele Anmeldeversuche. Bitte versuchen Sie es in ${minuten} Minute${minuten === 1 ? '' : 'n'} erneut.`
+  }
+  if (inhalt.error === 'auth_unavailable') {
+    return 'Der Anmeldedienst ist momentan nicht erreichbar. Bitte versuchen Sie es später erneut.'
+  }
+  // email_not_confirmed und invalid_credentials teilen sich die Texte mit dem
+  // direkten Supabase-Weg — dieselbe Formulierung wie bisher.
+  return uebersetzeAuthFehler({ code: inhalt.error })
+}
 
 export default function LoginScreen() {
   const router = useRouter()
@@ -74,27 +90,50 @@ export default function LoginScreen() {
     // „falsches Passwort", obwohl das Passwort stimmt.
     const emailNormalisiert = email.trim().toLowerCase()
 
-    try {
-      let { data, error } = await loginClient.auth.signInWithPassword({
-        email: emailNormalisiert,
-        password,
+    // Anmeldung über unser Backend statt direkt gegen Supabase: Nur so greift
+    // für die App dasselbe Rate-Limit (IP + E-Mail) wie fürs Web. Vorher stand
+    // vor dem App-Login kein eigener Schutz — der Anon-Key ist aus dem Bundle
+    // auslesbar, und das Rate-Limit der Web-Route wurde nie durchlaufen.
+    const anmelden = (captchaToken?: string) =>
+      fetch(`${API_URL}/api/app-auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailNormalisiert, password, captchaToken }),
       })
 
-      // CAPTCHA-Zwischenschritt nur, wenn Supabase ihn verlangt: Safari-Fenster
-      // öffnen, Token holen, Aufruf einmal wiederholen.
-      if (istCaptchaFehler(error)) {
+    try {
+      let antwort = await anmelden()
+      let inhalt = (await antwort.json().catch(() => ({}))) as {
+        error?: string
+        resetIn?: number
+        access_token?: string
+        refresh_token?: string
+      }
+
+      // CAPTCHA nur, wenn der Supabase-Schalter es verlangt: Sicherheitsprüfung
+      // holen und den Aufruf einmal wiederholen. Ist der Schalter aus, kommt
+      // dieser Zweig nie zum Tragen — dann bleibt der Login ein einziger Aufruf.
+      if (inhalt.error === 'captcha_required') {
         const captcha = await fordereCaptchaToken()
         if (!captcha.ok) {
           Alert.alert('Anmeldung fehlgeschlagen', captchaFehlerText(captcha.grund))
           return
         }
-        ;({ data, error } = await loginClient.auth.signInWithPassword({
-          email: emailNormalisiert,
-          password,
-          options: { captchaToken: captcha.token },
-        }))
+        antwort = await anmelden(captcha.token)
+        inhalt = (await antwort.json().catch(() => ({}))) as typeof inhalt
       }
 
+      if (!antwort.ok || !inhalt.access_token || !inhalt.refresh_token) {
+        Alert.alert('Anmeldung fehlgeschlagen', loginFehlerText(inhalt))
+        return
+      }
+
+      // Tokens auf den Handshake-Client setzen — ab hier läuft der 2FA-Schritt
+      // unverändert wie zuvor.
+      const { data, error } = await loginClient.auth.setSession({
+        access_token: inhalt.access_token,
+        refresh_token: inhalt.refresh_token,
+      })
       if (error || !data.session) {
         Alert.alert('Anmeldung fehlgeschlagen', uebersetzeAuthFehler(error))
         return
@@ -118,6 +157,13 @@ export default function LoginScreen() {
 
       // Kein Faktor hinterlegt: Login unverändert — Session direkt übergeben.
       await uebernehmeSession(data.session.access_token, data.session.refresh_token)
+    } catch {
+      // fetch wirft nur bei Netzwerkfehlern — ohne diesen Zweig bliebe der
+      // Fehler unbehandelt und der Nutzer ohne Rückmeldung.
+      Alert.alert(
+        'Anmeldung fehlgeschlagen',
+        'Keine Verbindung zum Server. Bitte prüfen Sie Ihre Internetverbindung.',
+      )
     } finally {
       setLoading(false)
     }
