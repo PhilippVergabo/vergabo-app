@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import { Stack, useRouter } from 'expo-router'
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { API_URL } from '@/lib/config'
 import { captchaFehlerText, fordereCaptchaToken } from '@/components/Turnstile'
 import { C } from '@/lib/theme'
@@ -20,7 +20,11 @@ import { C } from '@/lib/theme'
 
 export default function PasswortVergessenScreen() {
   const router = useRouter()
-  const [email, setEmail] = useState('')
+  // Vom Login-Screen mitgegebene Adresse als Startwert: Wer sich gerade
+  // vertippt hat, soll sie hier nicht erneut eintippen müssen. Nur als
+  // Anfangswert — Änderungen im Feld bleiben davon unberührt.
+  const { email: emailAusLogin } = useLocalSearchParams<{ email?: string }>()
+  const [email, setEmail] = useState(emailAusLogin ?? '')
   const [loading, setLoading] = useState(false)
   const [gesendet, setGesendet] = useState(false)
 
