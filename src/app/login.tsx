@@ -307,7 +307,14 @@ export default function LoginScreen() {
             </Pressable>
 
             <Pressable
-              onPress={() => router.push('/passwort-vergessen')}
+              // Eingetippte E-Mail mitnehmen — nach einem gescheiterten Login
+              // ist sie im Formular schon da und muss nicht erneut getippt werden.
+              onPress={() =>
+                router.push({
+                  pathname: '/passwort-vergessen',
+                  params: { email: email.trim() },
+                })
+              }
               hitSlop={8}
               style={styles.forgotRow}
             >
