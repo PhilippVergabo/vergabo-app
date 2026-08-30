@@ -13,12 +13,12 @@ import {
   View,
 } from 'react-native'
 import { useRouter } from 'expo-router'
-import { supabase } from '@/lib/supabase'
+import { API_URL } from '@/lib/config'
 import { uebersetzeAuthFehler } from '@/lib/authFehler'
 import { AdressAutocomplete } from '@/components/AdressAutocomplete'
 import { PasswortFeld } from '@/components/PasswortFeld'
 import { bundeslandKuerzel } from '@/lib/adressSuche'
-import { captchaFehlerText, fordereCaptchaToken, istCaptchaFehler } from '@/components/Turnstile'
+import { captchaFehlerText, fordereCaptchaToken } from '@/components/Turnstile'
 import { C } from '@/lib/theme'
 
 const ORG_TYPEN = [
@@ -61,6 +61,21 @@ function Auswahl({ label, aktiv, onPress }: { label: string; aktiv: boolean; onP
   )
 }
 
+// Fehlercodes der Backend-Route übersetzen (app/api/app-auth/registrieren).
+function registrierFehlerText(inhalt: { error?: string; message?: string; resetIn?: number }): string {
+  if (inhalt.error === 'rate_limited') {
+    const minuten = inhalt.resetIn ?? 60
+    return `Zu viele Registrierungen in kurzer Zeit. Bitte versuchen Sie es in ${minuten} Minute${minuten === 1 ? '' : 'n'} erneut.`
+  }
+  if (inhalt.error === 'weak_password') {
+    return 'Das Passwort erfüllt nicht die Mindestanforderungen.'
+  }
+  if (inhalt.error === 'auth_unavailable') {
+    return 'Der Anmeldedienst ist momentan nicht erreichbar. Bitte versuchen Sie es später erneut.'
+  }
+  return uebersetzeAuthFehler({ message: inhalt.message })
+}
+
 export default function RegistrierenAuftraggeber() {
   const router = useRouter()
   const [schritt, setSchritt] = useState(1)
@@ -97,52 +112,76 @@ export default function RegistrierenAuftraggeber() {
 
   async function handleSubmit() {
     setLoading(true)
-    // CAPTCHA nur bei Bedarf (Supabase-Schalter aktiv): erst ohne Token,
-    // bei CAPTCHA-Fehler Safari-Fenster öffnen und einmal wiederholen.
+    // Registrierung über das eigene Backend statt direkt gegen Supabase:
+    // Dort greift ein Rate-Limit gegen Massenanlagen (jede Anlage erzeugt ein
+    // zu prüfendes Konto und eine Bestätigungsmail), und die Metadaten werden
+    // auf die Felder dieser Rolle beschränkt.
     const anmelden = (captchaToken?: string) =>
-      supabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: {
+      fetch(`${API_URL}/api/app-auth/registrieren`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          password,
+          rolle: 'auftraggeber',
           captchaToken,
-          data: {
-            rolle: 'auftraggeber',
-            organisation_name: organisationName,
-            organisation_typ: organisationTyp,
-            ansprechpartner,
-            telefon: '',
-            strasse,
-            hausnummer,
-            plz,
-            ort,
-            bundesland,
+          daten: {
+          organisation_name: organisationName,
+          organisation_typ: organisationTyp,
+          ansprechpartner,
+          telefon: '',
+          strasse,
+          hausnummer,
+          plz,
+          ort,
+          bundesland,
           },
-        },
+        }),
       })
 
-    let { data, error } = await anmelden()
-    if (istCaptchaFehler(error)) {
-      const captcha = await fordereCaptchaToken()
-      if (!captcha.ok) {
-        setLoading(false)
-        Alert.alert('Registrierung abgebrochen', captchaFehlerText(captcha.grund))
+    try {
+      let antwort = await anmelden()
+      let inhalt = (await antwort.json().catch(() => ({}))) as {
+        error?: string
+        message?: string
+        resetIn?: number
+        bereits_registriert?: boolean
+      }
+
+      // CAPTCHA nur, wenn der Supabase-Schalter es verlangt.
+      if (inhalt.error === 'captcha_required') {
+        const captcha = await fordereCaptchaToken()
+        if (!captcha.ok) {
+          Alert.alert('Registrierung abgebrochen', captchaFehlerText(captcha.grund))
+          return
+        }
+        antwort = await anmelden(captcha.token)
+        inhalt = (await antwort.json().catch(() => ({}))) as typeof inhalt
+      }
+
+      if (!antwort.ok) {
+        Alert.alert('Registrierung fehlgeschlagen', registrierFehlerText(inhalt))
         return
       }
-      ;({ data, error } = await anmelden(captcha.token))
-    }
-    setLoading(false)
-    if (error) {
-      Alert.alert('Registrierung fehlgeschlagen', uebersetzeAuthFehler(error))
-      return
-    }
-    if (data.user && (data.user.identities?.length ?? 0) === 0) {
+
+      // Anti-Enumeration: existiert die E-Mail bereits, meldet Supabase keinen
+      // Fehler und verschickt keine Mail. Diesen Fall sauber melden.
+      if (inhalt.bereits_registriert) {
+        Alert.alert(
+          'E-Mail bereits registriert',
+          'Für diese E-Mail-Adresse besteht schon ein Konto. Bitte melden Sie sich an oder nutzen Sie auf vergabo.de „Passwort vergessen".',
+        )
+        return
+      }
+      setFertig(true)
+    } catch {
       Alert.alert(
-        'E-Mail bereits registriert',
-        'Für diese E-Mail-Adresse besteht schon ein Konto. Bitte melden Sie sich an oder nutzen Sie auf vergabo.de „Passwort vergessen".',
+        'Registrierung fehlgeschlagen',
+        'Keine Verbindung zum Server. Bitte prüfen Sie Ihre Internetverbindung.',
       )
-      return
+    } finally {
+      setLoading(false)
     }
-    setFertig(true)
   }
 
   if (fertig) {

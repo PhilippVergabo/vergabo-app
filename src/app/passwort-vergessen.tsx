@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -9,8 +10,8 @@ import {
   View,
 } from 'react-native'
 import { Stack, useRouter } from 'expo-router'
-import { supabase } from '@/lib/supabase'
-import { fordereCaptchaToken, istCaptchaFehler } from '@/components/Turnstile'
+import { API_URL } from '@/lib/config'
+import { captchaFehlerText, fordereCaptchaToken } from '@/components/Turnstile'
 import { C } from '@/lib/theme'
 
 // Passwort-Reset per E-Mail-Link. Der Link führt auf die Web-Plattform
@@ -28,24 +29,52 @@ export default function PasswortVergessenScreen() {
     if (!mail || loading) return
     setLoading(true)
 
-    const redirectTo = 'https://www.vergabo.de/passwort-reset'
-    const { error } = await supabase.auth.resetPasswordForEmail(mail, { redirectTo })
+    // Über das eigene Backend: Dieser Endpunkt verschickt E-Mails und ist damit
+    // der Mail-Flut-Vektor schlechthin — dort greift ein Rate-Limit. Das
+    // Reset-Ziel setzt der Server, nicht der Client (sonst offener Redirect).
+    const anfordern = (captchaToken?: string) =>
+      fetch(`${API_URL}/api/app-auth/passwort-reset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: mail, captchaToken }),
+      })
 
-    // CAPTCHA-Zwischenschritt nur, wenn Supabase ihn verlangt. Bricht der
-    // Nutzer ab, KEINE Erfolgsmeldung zeigen — es wurde ja nichts gesendet.
-    if (istCaptchaFehler(error)) {
-      const captcha = await fordereCaptchaToken()
-      if (!captcha.ok) {
-        setLoading(false)
+    try {
+      let antwort = await anfordern()
+      let inhalt = (await antwort.json().catch(() => ({}))) as { error?: string; resetIn?: number }
+
+      // CAPTCHA-Zwischenschritt nur, wenn Supabase ihn verlangt. Bricht der
+      // Nutzer ab, KEINE Erfolgsmeldung zeigen — es wurde ja nichts gesendet.
+      if (inhalt.error === 'captcha_required') {
+        const captcha = await fordereCaptchaToken()
+        if (!captcha.ok) {
+          Alert.alert('Nicht gesendet', captchaFehlerText(captcha.grund))
+          return
+        }
+        antwort = await anfordern(captcha.token)
+        inhalt = (await antwort.json().catch(() => ({}))) as typeof inhalt
+      }
+
+      if (inhalt.error === 'rate_limited') {
+        const minuten = inhalt.resetIn ?? 60
+        Alert.alert(
+          'Zu viele Anfragen',
+          `Es wurden bereits mehrere Links angefordert. Bitte versuchen Sie es in ${minuten} Minute${minuten === 1 ? '' : 'n'} erneut.`,
+        )
         return
       }
-      await supabase.auth.resetPasswordForEmail(mail, { redirectTo, captchaToken: captcha.token })
-    }
 
-    // Sonst bewusst kein Fehler-Branch nach außen: die Antwort verrät nicht,
-    // ob die Adresse registriert ist.
-    setLoading(false)
-    setGesendet(true)
+      // Sonst bewusst kein Fehler-Branch nach außen: die Antwort verrät nicht,
+      // ob die Adresse registriert ist.
+      setGesendet(true)
+    } catch {
+      Alert.alert(
+        'Nicht gesendet',
+        'Keine Verbindung zum Server. Bitte prüfen Sie Ihre Internetverbindung.',
+      )
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
