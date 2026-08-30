@@ -87,6 +87,7 @@ gemergt werden — nicht mittendrin. Nachrechnen mit
   ungefragt `eslint` + `eslint-config-expo` in die `package.json`, ohne sie zu
   installieren — so entstandene Zeilen nie committen. Neue Lint-Dev-Deps immer
   via `npx expo install -- --save-dev <pkg>` (wählt SDK-kompatible Versionen).
+- ⚠️ **`eas submit --non-interactive` verlangt `ascAppId` in der `eas.json` — nicht einfach eintragen.** Die `eas.json` fließt in den Fingerprint ein: Ein nachträglicher Eintrag verschiebt die `runtimeVersion` und **koppelt den bereits gebauten Build vom OTA-Kanal ab** (geprüft am 30.08.2026: `4ff8dc27…` → `bb02aa4d…`). Entweder interaktiv submitten (`eas submit --platform ios --latest`) oder den Eintrag zusammen mit dem **nächsten** nativen Build vornehmen, wenn der Fingerprint ohnehin neu berechnet wird. App-Store-Connect-ID: `6796830894`.
 - Typprüfung geht: `npx tsc --noEmit`.
 - Das Web-Backend (`/api/*` auf www.vergabo.de) ist ein **eigenes Repo**
   (`../vergabo`). Änderungen an API-Verträgen immer auf beiden Seiten denken —
