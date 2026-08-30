@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native'
 import { supabase } from '@/lib/supabase'
+import { meinAnbieterId, KEIN_PROFIL } from '@/lib/mitgliedschaft'
 import { AdressAutocomplete } from '@/components/AdressAutocomplete'
 import { bundeslandKuerzel } from '@/lib/adressSuche'
 import { GEWERK_LABELS } from '@/lib/labels'
@@ -107,10 +108,12 @@ export default function ProfilScreen() {
         setLaden(false)
         return
       }
+      // Zuordnung über die Mitgliedschaft (anbieter_profile.user_id existiert nicht mehr).
+      const anbieterId = await meinAnbieterId(userId)
       const { data: profil, error } = await supabase
         .from('anbieter_profile')
         .select('*')
-        .eq('user_id', userId)
+        .eq('id', anbieterId ?? KEIN_PROFIL)
         .maybeSingle()
       if (error || !profil) {
         setLadeFehler(true)
@@ -193,7 +196,8 @@ export default function ProfilScreen() {
           iban: iban.trim() || null,
           bic: bic.trim() || null,
         })
-        .eq('user_id', userId)
+        // Wie beim Laden: über die Mitgliedschaft, nicht über user_id.
+        .eq('id', (await meinAnbieterId(userId)) ?? KEIN_PROFIL)
       if (error) {
         Alert.alert('Speichern fehlgeschlagen', 'Beim Speichern ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.')
         return

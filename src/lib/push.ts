@@ -3,6 +3,7 @@ import * as Device from 'expo-device'
 import * as Notifications from 'expo-notifications'
 import Constants from 'expo-constants'
 import { supabase } from '@/lib/supabase'
+import { meinAnbieterId, meinAuftraggeberId } from '@/lib/mitgliedschaft'
 
 // Wie Push-Nachrichten angezeigt werden, wenn die App im Vordergrund läuft.
 Notifications.setNotificationHandler({
@@ -60,7 +61,16 @@ export async function registriereFuerPush(
     const userId = sess.session?.user.id
     if (!userId) return
 
-    await supabase.from(profilTabelle).update({ expo_push_token: token }).eq('user_id', userId)
+    // Die Profiltabellen haben seit der Mitgliedschafts-Migration KEIN user_id
+    // mehr — der Filter traf deshalb nie eine Zeile und der Token wurde still
+    // verworfen. Zielzeile jetzt über die Mitgliedschaft bestimmen.
+    const profilId =
+      profilTabelle === 'anbieter_profile'
+        ? await meinAnbieterId(userId)
+        : await meinAuftraggeberId(userId)
+    if (!profilId) return
+
+    await supabase.from(profilTabelle).update({ expo_push_token: token }).eq('id', profilId)
   } catch {
     // non-fatal — Push ist optional
   }
