@@ -11,6 +11,7 @@ import {
 } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { supabase } from '@/lib/supabase'
+import { meinAnbieterId } from '@/lib/mitgliedschaft'
 import { AnhaengeSektion } from '@/components/angebot/AnhaengeSektion'
 import { BasisFelder } from '@/components/angebot/BasisFelder'
 import { KalkulationSektion } from '@/components/angebot/KalkulationSektion'
@@ -136,23 +137,20 @@ export default function BewerbenScreen() {
       // Anbieter-Profil + verifizierte Eigenerklärungen für Profil-Abgleich
       const { data: sess } = await supabase.auth.getSession()
       if (sess.session) {
-        const { data: ap } = await supabase
-          .from('anbieter_profile')
-          .select('id')
-          .eq('user_id', sess.session.user.id)
-          .single()
-        if (ap) {
+        // Zuordnung über die Mitgliedschaft (anbieter_profile.user_id existiert nicht mehr).
+        const anbieterId = await meinAnbieterId(sess.session.user.id)
+        if (anbieterId) {
           const { count } = await supabase
             .from('bewerbungen')
             .select('id', { count: 'exact', head: true })
-            .eq('anbieter_id', ap.id)
+            .eq('anbieter_id', anbieterId)
           const nr = ((count ?? 0) + 1).toString().padStart(3, '0')
           setAngebotsnummer(`${new Date().getFullYear()}-${nr}`)
 
           const { data: eks } = await supabase
             .from('eigenerklarungen')
             .select('id, typ, admin_verifiziert')
-            .eq('anbieter_id', ap.id)
+            .eq('anbieter_id', anbieterId)
             .eq('admin_verifiziert', true)
 
           const autoBest: Record<string, boolean> = {}

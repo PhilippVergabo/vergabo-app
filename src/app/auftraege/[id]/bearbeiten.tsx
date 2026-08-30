@@ -11,6 +11,7 @@ import {
 } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { supabase } from '@/lib/supabase'
+import { meinAnbieterId } from '@/lib/mitgliedschaft'
 import { AnhaengeSektion } from '@/components/angebot/AnhaengeSektion'
 import { BasisFelder } from '@/components/angebot/BasisFelder'
 import { KalkulationSektion } from '@/components/angebot/KalkulationSektion'
@@ -113,12 +114,9 @@ export default function BewerbungBearbeitenScreen() {
         return
       }
 
-      const { data: ap } = await supabase
-        .from('anbieter_profile')
-        .select('id')
-        .eq('user_id', sess.session.user.id)
-        .single()
-      if (!ap) {
+      // Zuordnung über die Mitgliedschaft (anbieter_profile.user_id existiert nicht mehr).
+      const anbieterId = await meinAnbieterId(sess.session.user.id)
+      if (!anbieterId) {
         setNichtBearbeitbar(true)
         setLoading(false)
         return
@@ -129,7 +127,7 @@ export default function BewerbungBearbeitenScreen() {
         .from('bewerbungen')
         .select('*')
         .eq('auftrag_id', id)
-        .eq('anbieter_id', ap.id)
+        .eq('anbieter_id', anbieterId)
         .in('status', ['eingereicht', 'in_pruefung'])
         .single()
 
@@ -204,7 +202,7 @@ export default function BewerbungBearbeitenScreen() {
       const { data: eks } = await supabase
         .from('eigenerklarungen')
         .select('id, typ, admin_verifiziert')
-        .eq('anbieter_id', ap.id)
+        .eq('anbieter_id', anbieterId)
         .eq('admin_verifiziert', true)
 
       const autoBest: Record<string, boolean> = {}

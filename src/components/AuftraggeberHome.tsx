@@ -11,6 +11,7 @@ import {
 import { useRouter, useFocusEffect, type Href } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
+import { meinAuftraggeberId } from '@/lib/mitgliedschaft'
 import { abmeldenMitBestaetigung } from '@/lib/auth'
 import { addPushTapListener, registriereFuerPush } from '@/lib/push'
 import { authedFetch } from '@/lib/authedFetch'
@@ -108,12 +109,10 @@ export function AuftraggeberHome() {
       return
     }
 
-    const { data: ap } = await supabase
-      .from('auftraggeber_profile')
-      .select('id')
-      .eq('user_id', userId)
-      .single()
-    if (!ap) {
+    // Zuordnung über die Mitgliedschaft, nicht mehr über auftraggeber_profile.user_id
+    // — diese Spalte gibt es seit der Mitgliedschafts-Migration nicht mehr.
+    const auftraggeberId = await meinAuftraggeberId(userId)
+    if (!auftraggeberId) {
       setError('Kein Auftraggeber-Profil gefunden')
       return
     }
@@ -121,7 +120,7 @@ export function AuftraggeberHome() {
     const { data: auftraegeData, error: auftraegeError } = await supabase
       .from('auftraege')
       .select('id, titel, status, gewerk, ausfuehrungsort_ort, angebotsfrist, erstellt_am')
-      .eq('auftraggeber_id', ap.id)
+      .eq('auftraggeber_id', auftraggeberId)
       .order('erstellt_am', { ascending: false })
 
     if (auftraegeError) {
