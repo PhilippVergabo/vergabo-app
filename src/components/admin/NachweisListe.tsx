@@ -2,7 +2,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import * as WebBrowser from 'expo-web-browser'
 import { erklaerungLabel } from '@/lib/eigenerklarungTypen'
 import { C } from '@/lib/theme'
-import { NachweisBadge, type AdminDokument } from './NachweisBadge'
+import { NachweisBadge, istOffenerNachweis, type AdminDokument } from './NachweisBadge'
 
 type Props = {
   /** Anbieter-Name — nur für das Accessibility-Label des Toggles. */
@@ -59,7 +59,9 @@ export function NachweisListe({
             <Text style={[styles.meta, { marginTop: 8 }]}>Keine Nachweise hinterlegt.</Text>
           ) : (
             dokumente.map((d) => {
-              const unentschieden = !d.admin_verifiziert && !d.admin_abgelehnt
+              // Buttons nur, wo es wirklich etwas zu entscheiden gibt — dieselbe
+              // Bedingung wie Badge und Zählung (siehe istOffenerNachweis).
+              const unentschieden = istOffenerNachweis(d)
               const busy = busyDokId === d.id
               return (
                 <View key={d.id} style={styles.dokEintrag}>

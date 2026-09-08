@@ -16,15 +16,21 @@ export type AdminDokument = {
 /**
  * Wartet dieser Nachweis auf eine Admin-Entscheidung („⏳ in Prüfung")?
  *
- * Genau die Bedingung, unter der NachweisBadge unten in den letzten Zweig
- * fällt — hier ausgelagert, damit die Zählung am Karten-Kopf und das Badge in
- * der Liste nicht auseinanderlaufen können.
+ * Entscheidend ist die DATEI. Eine Eigenerklärung ohne Datei ist eine
+ * verbindliche Erklärung des Anbieters, kein zu begutachtendes Dokument —
+ * daran kann ein Admin nichts entscheiden. Der Web-Admin blendet für diese
+ * Fälle bewusst weder Status noch Prüf-Buttons ein
+ * (app/admin/anbieter/page.tsx), und /api/app-admin/anbieter zählt sie aus
+ * demselben Grund nicht mit.
  *
- * „fehlt" (weder bestätigt noch Datei hinterlegt) zählt bewusst NICHT: daran
- * gibt es für den Admin nichts zu entscheiden, der Anbieter muss erst liefern.
+ * Die App wich hier ab: Sie zeigte „in Prüfung" samt Buttons auch ohne Datei.
+ * Dadurch stimmte der Badge am Karten-Kopf (Server-Zählung) nicht mit der
+ * aufgeklappten Liste (lokale Zählung) überein — der Hinweis erschien erst
+ * NACH dem Öffnen der Nachweise. Diese Bedingung ist jetzt für Zählung, Badge
+ * und Buttons dieselbe und deckt sich mit Web und Backend.
  */
 export function istOffenerNachweis(d: AdminDokument): boolean {
-  if (!d.bestaetigt && !d.dateiname) return false
+  if (!d.dateiname) return false
   return !d.admin_verifiziert && !d.admin_abgelehnt
 }
 
@@ -33,11 +39,21 @@ export function zaehleOffeneNachweise(dokumente: AdminDokument[]): number {
   return dokumente.filter(istOffenerNachweis).length
 }
 
-// Status-Logik wie StatusBadge in eigenerklarungen.tsx (Anbieter-Sicht),
-// damit Admin und Anbieter denselben Zustand sehen.
+// Status-Logik gespiegelt aus dem Web-Admin (app/admin/anbieter/page.tsx),
+// damit beide Oberflächen denselben Zustand zeigen.
 export function NachweisBadge({ d }: { d: AdminDokument }) {
+  // Gar nichts geliefert: Der Anbieter muss erst tätig werden. Eigener Zustand
+  // statt „keine Prüfung nötig" — der Unterschied ist für den Admin sichtbar
+  // relevant, für die Prüfpflicht aber ohne Folge (beides: nichts zu tun).
   if (!d.bestaetigt && !d.dateiname) {
     return <Text style={[styles.dokBadge, styles.dokBadgeFehlt]}>fehlt</Text>
+  }
+  if (!d.dateiname) {
+    return (
+      <Text style={[styles.dokBadge, styles.dokBadgeErklaerung]}>
+        Eigenerklärung – keine Prüfung nötig
+      </Text>
+    )
   }
   if (d.admin_verifiziert) {
     return <Text style={[styles.dokBadge, styles.dokBadgeOk]}>✓ freigegeben</Text>
@@ -58,6 +74,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   dokBadgeFehlt: { backgroundColor: C.card, color: C.muted },
+  dokBadgeErklaerung: { backgroundColor: '#f0efe9', color: C.muted },
   dokBadgeOk: { backgroundColor: C.ok, color: C.primary },
   dokBadgeWartet: { backgroundColor: C.warn, color: C.accent },
   dokBadgeAbgelehnt: { backgroundColor: '#f7e3df', color: '#7a3320' },
