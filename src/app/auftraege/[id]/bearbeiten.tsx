@@ -28,6 +28,7 @@ import {
   type Position,
 } from '@/lib/bewerbung'
 import { authedFetch } from '@/lib/authedFetch'
+import { AutoZurueck } from '@/components/AutoZurueck'
 import { C } from '@/lib/theme'
 
 // Bereits gespeicherter Nachweis aus der Bewerbung (Quelle + ggf. Datei-Pfad).
@@ -365,6 +366,7 @@ export default function BewerbungBearbeitenScreen() {
         <Pressable style={styles.submitBtn} onPress={() => router.replace(`/auftraege/${id}`)}>
           <Text style={styles.submitText}>Zurück zur Ausschreibung</Text>
         </Pressable>
+        <AutoZurueck onAblauf={() => router.replace(`/auftraege/${id}`)} />
       </View>
     )
   }
