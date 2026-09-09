@@ -28,6 +28,7 @@ import {
   type Position,
 } from '@/lib/bewerbung'
 import { authedFetch } from '@/lib/authedFetch'
+import { AutoZurueck } from '@/components/AutoZurueck'
 import { C } from '@/lib/theme'
 
 export default function BewerbenScreen() {
@@ -306,6 +307,7 @@ export default function BewerbenScreen() {
         <Pressable style={styles.submitBtn} onPress={() => router.replace('/')}>
           <Text style={styles.submitText}>Zurück zur Übersicht</Text>
         </Pressable>
+        <AutoZurueck onAblauf={() => router.replace('/')} />
       </View>
     )
   }
