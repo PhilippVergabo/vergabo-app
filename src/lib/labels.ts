@@ -19,16 +19,50 @@ export function gewerkLabel(gewerk: string | null | undefined): string {
 }
 
 // Vergabeverfahren → Anzeige-Label (dezente Zusatzinfo in Karten/Detail).
-export const VERFAHREN_LABELS: Record<string, string> = {
+//
+// Behördensprache statt Eigenwortschatz — und die richtige Behördensprache
+// hängt von der Leistungsart ab:
+//
+//   Bauleistung    VOB/A-Welt: „Freihändige Vergabe"
+//   Dienstleistung UVgO-Welt:  „Verhandlungsvergabe"
+//
+// „Direktvergabe" stand hier bis 11.09.2026 und war ein Wort, das in keiner
+// Norm vorkommt. Das Web hat es am 11.08.2026 abgeschafft (lib/verfahren.ts);
+// die App zeigte es weiter — der Bieter las in der App eine andere
+// Verfahrensart als auf der Webseite und im Vergabevermerk.
+//
+// ⚠️ NUR Anzeigetexte. Die DB-Enum-Werte (direktauftrag, direktvergabe_3,
+// beschraenkte_ausschreibung) bleiben unverändert. Der Schlüssel
+// `direktvergabe_3` ist historisch und sagt nichts über das Verfahren aus.
+//
+// Spiegelt lib/verfahren.ts im Web-Repo — Änderungen dort gehören hierher.
+type LabelSatz = Record<string, string>
+
+const LABELS_BAU: LabelSatz = {
   direktauftrag: 'Direktauftrag',
-  direktvergabe_3: 'Direktvergabe',
+  direktvergabe_3: 'Freihändige Vergabe',
   beschraenkte_ausschreibung: 'Beschränkte Ausschreibung',
 }
 
+const LABELS_DIENST: LabelSatz = {
+  direktauftrag: 'Direktauftrag',
+  direktvergabe_3: 'Verhandlungsvergabe',
+  beschraenkte_ausschreibung: 'Beschränkte Ausschreibung',
+}
+
+// Ohne Angabe gilt die Bauleistung — Vergabos Bestandsdaten und Kerngeschäft.
+// Dieselbe Vorgabe wie alsLeistungsart() im Web.
+function labelSatz(leistungsart?: string | null): LabelSatz {
+  return leistungsart === 'dienstleistung' ? LABELS_DIENST : LABELS_BAU
+}
+
 // Schlüssel → Label; unbekannte Werte werden unverändert zurückgegeben.
-export function verfahrenLabel(verfahren: string | null | undefined): string {
+export function verfahrenLabel(
+  verfahren: string | null | undefined,
+  leistungsart?: string | null,
+): string {
   if (!verfahren) return ''
-  return VERFAHREN_LABELS[verfahren] ?? verfahren
+  return labelSatz(leistungsart)[verfahren] ?? verfahren
 }
 
 // Auftragsstatus → Anzeige-Label + Badge-Farben (Hintergrund, Text).

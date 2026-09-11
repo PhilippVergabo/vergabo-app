@@ -92,3 +92,31 @@ gemergt werden — nicht mittendrin. Nachrechnen mit
 - Das Web-Backend (`/api/*` auf www.vergabo.de) ist ein **eigenes Repo**
   (`../vergabo`). Änderungen an API-Verträgen immer auf beiden Seiten denken —
   und beachten, dass alte App-Builds noch lange im Umlauf sind.
+
+## ⚠️ Doppelt gehaltene Regeln — Abgleich mit dem Web-Repo
+
+Mehrere fachliche Regeln liegen **zweimal** vor: einmal im Web (`../vergabo`),
+einmal hier. Das ist gewollt (die App soll ohne Netz rechnen können), läuft aber
+still auseinander — beim Abgleich am 11.09.2026 waren vier Stellen veraltet,
+darunter eine rechtlich relevante Verfahrensbezeichnung.
+
+| Hier | Gegenstück im Web | Worauf achten |
+|---|---|---|
+| `src/lib/labels.ts` → `verfahrenLabel` | `lib/verfahren.ts` | Bezeichnung hängt an der **Leistungsart**: „Freihändige Vergabe" (VOB/A) vs. „Verhandlungsvergabe" (UVgO) |
+| `src/lib/bewerbung.ts` → `EINHEITEN` | `lib/einheiten.ts` | Liste UND Reihenfolge — die App schaltet per Tippen durch |
+| `src/lib/eigenerklarungTypen.ts` | `lib/eigenerklarungTypen.ts` | Neue Typen, `pflicht`/`belegbar` |
+| `src/lib/budgetRange.ts` | `lib/budgetRange.ts` | Stufen |
+| `src/lib/labels.ts` → `GEWERK_LABELS` | `lib/gewerke.ts` | Schlüssel und Labels |
+
+**Beim Anfassen einer dieser Dateien im Web immer hier gegenprüfen.** Ein
+schneller Abgleich:
+
+```bash
+diff ../vergabo/lib/budgetRange.ts src/lib/budgetRange.ts
+```
+
+⚠️ **Nicht jede Web-Änderung gehört in die App.** Archiv-Ansicht und
+Admin-Abrechnung gibt es hier bewusst nicht — das ist nicht portierter
+Funktionsumfang, kein Drift. Unterschieden wird danach, ob **dieselbe Regel**
+zwei Antworten gibt (Drift, gehört abgeglichen) oder ob eine Funktion schlicht
+fehlt (Produktentscheidung).

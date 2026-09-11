@@ -37,6 +37,26 @@ type Erklaerung = {
   admin_abgelehnt: boolean | null
 }
 
+/**
+ * Die Schreibvorgänge liefen bis 11.09.2026 ohne jede Auswertung — ein
+ * gescheiterter Insert blieb still, der Bildschirm zeigte danach einfach den
+ * alten Stand.
+ *
+ * Seit dem Unique-Constraint `eigenerklarungen_ein_nachweis_je_typ` (Web-PR
+ * #157) gibt es dafür einen konkreten Auslöser: Wurde derselbe Nachweis
+ * parallel am Rechner angelegt, kennt die App die Zeile nicht und legt sie
+ * erneut an — die Datenbank lehnt das jetzt ab.
+ *
+ * `23505` ist deshalb kein echter Fehlschlag, sondern ein veralteter Stand:
+ * Der Nachweis IST hinterlegt. Der Aufrufer lädt in dem Fall neu und sagt das
+ * auch so, statt eine Postgres-Meldung anzuzeigen.
+ */
+const IST_DOPPELTER_EINTRAG = (fehler: { code?: string }) => fehler.code === '23505'
+
+function dbFehlerText(fehler: { message?: string }): string {
+  return fehler.message ?? 'Der Eintrag konnte nicht gespeichert werden. Bitte erneut versuchen.'
+}
+
 function StatusBadge({ e }: { e: Erklaerung | undefined }) {
   if (!e || (!e.bestaetigt && !e.dateiname)) {
     return <Text style={[styles.badge, styles.badgeFehlt]}>fehlt</Text>
@@ -144,15 +164,26 @@ export default function EigenerklarungenScreen() {
 
       // DB-Eintrag – erst nach bestandener Verifikation (Spiegel Web)
       const bestehend = getErklaerung(typ)
-      if (bestehend) {
-        await supabase
-          .from('eigenerklarungen')
-          .update({ dateiname: sicherName, bestaetigt: true })
-          .eq('id', bestehend.id)
-      } else {
-        await supabase
-          .from('eigenerklarungen')
-          .insert({ anbieter_id: profilId, typ, dateiname: sicherName, bestaetigt: true })
+      const { error: dbErr } = bestehend
+        ? await supabase
+            .from('eigenerklarungen')
+            .update({ dateiname: sicherName, bestaetigt: true })
+            .eq('id', bestehend.id)
+        : await supabase
+            .from('eigenerklarungen')
+            .insert({ anbieter_id: profilId, typ, dateiname: sicherName, bestaetigt: true })
+      if (dbErr) {
+        if (IST_DOPPELTER_EINTRAG(dbErr)) {
+          await load()
+          Alert.alert(
+            'Bereits hinterlegt',
+            'Dieser Nachweis war schon vorhanden – vermutlich an einem anderen Gerät '
+            + 'angelegt. Die Liste ist jetzt auf dem neuesten Stand.',
+          )
+          return
+        }
+        Alert.alert('Nicht gespeichert', dbFehlerText(dbErr))
+        return
       }
       await load()
     } finally {
@@ -171,12 +202,23 @@ export default function EigenerklarungenScreen() {
     setBusyTyp(typ)
     try {
       const bestehend = getErklaerung(typ)
-      if (bestehend) {
-        await supabase.from('eigenerklarungen').update({ bestaetigt: true }).eq('id', bestehend.id)
-      } else {
-        await supabase
-          .from('eigenerklarungen')
-          .insert({ anbieter_id: profilId, typ, dateiname: null, bestaetigt: true })
+      const { error: dbErr } = bestehend
+        ? await supabase.from('eigenerklarungen').update({ bestaetigt: true }).eq('id', bestehend.id)
+        : await supabase
+            .from('eigenerklarungen')
+            .insert({ anbieter_id: profilId, typ, dateiname: null, bestaetigt: true })
+      if (dbErr) {
+        if (IST_DOPPELTER_EINTRAG(dbErr)) {
+          await load()
+          Alert.alert(
+            'Bereits hinterlegt',
+            'Dieser Nachweis war schon vorhanden – vermutlich an einem anderen Gerät '
+            + 'angelegt. Die Liste ist jetzt auf dem neuesten Stand.',
+          )
+          return
+        }
+        Alert.alert('Nicht gespeichert', dbFehlerText(dbErr))
+        return
       }
       await load()
     } finally {
@@ -222,27 +264,48 @@ export default function EigenerklarungenScreen() {
               <StatusBadge e={e} />
             </View>
 
+            {/* Reine Erklärung: Der Wortlaut MUSS sichtbar sein, bevor man ihn
+                bestätigt. Eine Zustimmung ohne Text ist keine Erklärung,
+                sondern ein Häkchen. */}
+            {!typ.belegbar && typ.erklaerungstext ? (
+              <Text style={styles.erklaerungstext}>{typ.erklaerungstext}</Text>
+            ) : null}
+
             <View style={styles.aktionen}>
-              <Pressable
-                style={[styles.btn, styles.btnPrimary, busy && styles.btnAus]}
-                onPress={() => hochladen(typ.id)}
-                disabled={busy}
-                accessibilityRole="button"
-                accessibilityLabel={`${typ.label} hochladen`}
-              >
-                <Text style={styles.btnPrimaryText}>
-                  {busy ? 'Wird geprüft …' : e?.dateiname ? 'Datei ersetzen' : 'Datei hochladen'}
-                </Text>
-              </Pressable>
+              {/* Kein Upload-Knopf, wo es nichts hochzuladen gibt: Für
+                  „ich zahle Mindestlohn" stellt keine Behörde eine Urkunde aus. */}
+              {typ.belegbar ? (
+                <Pressable
+                  style={[styles.btn, styles.btnPrimary, busy && styles.btnAus]}
+                  onPress={() => hochladen(typ.id)}
+                  disabled={busy}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${typ.label} hochladen`}
+                >
+                  <Text style={styles.btnPrimaryText}>
+                    {busy ? 'Wird geprüft …' : e?.dateiname ? 'Datei ersetzen' : 'Datei hochladen'}
+                  </Text>
+                </Pressable>
+              ) : null}
               {!typ.pflicht && !e?.bestaetigt ? (
                 <Pressable
-                  style={[styles.btn, styles.btnGhost, busy && styles.btnAus]}
+                  style={[
+                    styles.btn,
+                    // Ohne Upload-Knopf daneben ist das Bestätigen die
+                    // Hauptaktion und bekommt auch das Gewicht dafür.
+                    typ.belegbar ? styles.btnGhost : styles.btnPrimary,
+                    busy && styles.btnAus,
+                  ]}
                   onPress={() => bestaetigen(typ.id)}
                   disabled={busy}
                   accessibilityRole="button"
-                  accessibilityLabel={`${typ.label} ohne Datei bestätigen`}
+                  accessibilityLabel={
+                    typ.belegbar ? `${typ.label} ohne Datei bestätigen` : `${typ.label} bestätigen`
+                  }
                 >
-                  <Text style={styles.btnGhostText}>Ohne Datei bestätigen</Text>
+                  <Text style={typ.belegbar ? styles.btnGhostText : styles.btnPrimaryText}>
+                    {busy ? 'Wird gespeichert …' : typ.belegbar ? 'Ohne Datei bestätigen' : 'Erklärung abgeben'}
+                  </Text>
                 </Pressable>
               ) : null}
             </View>
@@ -264,6 +327,7 @@ const styles = StyleSheet.create({
   },
   mutedText: { color: C.muted, fontSize: 16 },
   intro: { fontSize: 13, color: C.muted, lineHeight: 19 },
+  erklaerungstext: { fontSize: 12, color: C.muted, lineHeight: 18, marginTop: 2 },
   karte: {
     backgroundColor: C.card,
     borderRadius: 12,

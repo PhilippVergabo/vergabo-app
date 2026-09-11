@@ -15,7 +15,42 @@ export interface Position {
   gesamt: number
 }
 
-export const EINHEITEN = ['Stunden', 'Pauschale', 'Stück', 'm²', 'm', 'kg', 'Liter']
+/**
+ * Mengeneinheiten für eigene Angebotspositionen.
+ *
+ * Spiegelt `lib/einheiten.ts` im Web-Repo — dort ist es die eine Quelle für
+ * Kostenschätzung (Auftraggeber) UND Angebot (Anbieter). Zwei Listen, die
+ * auseinanderlaufen, sind hier besonders heikel: Der Auftraggeber gibt die
+ * Einheit vor, der Bieter kalkuliert seinen Einzelpreis darauf.
+ *
+ * ⚠️ Reihenfolge ist Bedienung, nicht Kosmetik: Die App schaltet per Tippen
+ * durch die Liste (`zyklusEinheit`), deshalb fachlich gruppiert — Aufwand/Zeit
+ * → Pauschale → Stück → Länge/Fläche/Volumen → Vorhaltung → Gewicht →
+ * Flüssigkeit. Identisch zum Web, damit beide Seiten dieselbe Folge zeigen.
+ *
+ * Ergänzt am 11.09.2026 um Tage, Wochen, m³, Wochenmeter und t — das Web hatte
+ * sie seit 07.09.2026 (Tester-Rückmeldung aus dem Straßen- und Gartenbau:
+ * Bodenaushub und Entsorgung rechnen in m³ bzw. t, ein Bauzaun wird in
+ * Wochenmetern vorgehalten). Bis dahin konnte der Handwerker am Telefon keine
+ * eigene Position in diesen Einheiten anlegen, am Rechner schon.
+ *
+ * Vorgegebene LV-Positionen sind davon unberührt: Ihre Einheit ist gesperrt
+ * (`istGesperrt` in PositionenEditor), der Umschalt-Knopf ist dort `disabled`.
+ */
+export const EINHEITEN = [
+  'Stunden',
+  'Tage',
+  'Wochen',
+  'Pauschale',
+  'Stück',
+  'm',
+  'm²',
+  'm³',
+  'Wochenmeter',
+  'kg',
+  't',
+  'Liter',
+]
 
 // ── Leistungsverzeichnis (LV) ───────────────────────────────────────────────
 export interface LvPosition {
