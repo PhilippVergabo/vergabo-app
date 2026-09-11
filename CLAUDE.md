@@ -104,8 +104,9 @@ darunter eine rechtlich relevante Verfahrensbezeichnung.
 |---|---|---|
 | `src/lib/labels.ts` → `verfahrenLabel` | `lib/verfahren.ts` | Bezeichnung hängt an der **Leistungsart**: „Freihändige Vergabe" (VOB/A) vs. „Verhandlungsvergabe" (UVgO) |
 | `src/lib/bewerbung.ts` → `EINHEITEN` | `lib/einheiten.ts` | Liste UND Reihenfolge — die App schaltet per Tippen durch |
-| `src/lib/eigenerklarungTypen.ts` | `lib/eigenerklarungTypen.ts` | Neue Typen, `pflicht`/`belegbar` |
-| `src/lib/budgetRange.ts` | `lib/budgetRange.ts` | Stufen |
+| `src/lib/eigenerklarungTypen.ts` | `lib/eigenerklarungTypen.ts` | Neue Typen, `pflicht`/`kannAblaufen`/`belegbar` |
+| `src/lib/budgetRange.ts` | `lib/budgetRange.ts` | Stufen — **und das geschützte Leerzeichen** vor dem Euro-Zeichen (U+00A0, DIN 5008) |
+| `src/lib/nachweisGueltigkeit.ts` | `lib/nachweisGueltigkeit.ts` | Warnfenster (30 Tage), Statusnamen, Hinweistexte |
 | `src/lib/labels.ts` → `GEWERK_LABELS` | `lib/gewerke.ts` | Schlüssel und Labels |
 
 **Beim Anfassen einer dieser Dateien im Web immer hier gegenprüfen.** Ein
@@ -114,6 +115,22 @@ schneller Abgleich:
 ```bash
 diff ../vergabo/lib/budgetRange.ts src/lib/budgetRange.ts
 ```
+
+⚠️ **Eine Push-Nachricht ohne Gegenstück in der App ist auch Drift.** Am
+11.09.2026 gefunden: Der Cron verschickt „📄 Nachweis läuft bald ab – bitte
+aktualisieren Sie ihn", die App las `eigenerklarungen.gueltig_bis` aber gar
+nicht. Der Betrieb bekam die Benachrichtigung, öffnete die App und fand keine
+Stelle, an der stand, **welcher** Nachweis gemeint war. Die Nachweisliste zeigt
+die Gültigkeit jetzt an (nur Anzeige, gesetzt wird sie im Browser). **Beim
+Anlegen eines neuen Benachrichtigungstyps im Web mitdenken, ob die App zeigen
+kann, worum es geht** — sie empfängt jede In-App-Benachrichtigung als Push.
+
+⚠️ **Beim Ersetzen einer Datei leert die App `gueltig_bis`.** Das Datum gehörte
+zum alten Dokument; stehen zu lassen hieße, die neue Police mit der Laufzeit der
+alten zu beschriften. Die App kann kein Datum erfassen (dafür bräuchte es einen
+Datepicker) — kein Datum ist ehrlicher als ein falsches, und die Anzeige sagt
+„nicht hinterlegt (im Browser ergänzbar)". **Wer der App das Erfassen beibringt,
+nimmt diese Zeile mit heraus.**
 
 ⚠️ **Nicht jede Web-Änderung gehört in die App.** Archiv-Ansicht und
 Admin-Abrechnung gibt es hier bewusst nicht — das ist nicht portierter
