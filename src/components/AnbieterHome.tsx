@@ -119,7 +119,7 @@ export function AnbieterHome() {
       supabase
         .from('auftraege')
         .select(
-          'id, titel, gewerk, vergabeverfahren, ausfuehrungsort_plz, ausfuehrungsort_ort, ausfuehrungsort_lat, ausfuehrungsort_lon, frist:angebotsfrist, budget_max:budget_bis, created_at:erstellt_am',
+          'id, titel, gewerk, vergabeverfahren, leistungsart, ausfuehrungsort_plz, ausfuehrungsort_ort, ausfuehrungsort_lat, ausfuehrungsort_lon, frist:angebotsfrist, budget_max:budget_bis, created_at:erstellt_am',
         )
         .eq('status', 'veroeffentlicht')
         .order('erstellt_am', { ascending: false }),

@@ -6,15 +6,51 @@ export interface ErklaerungTyp {
   id: string
   label: string
   pflicht: boolean
+  /**
+   * Gibt es zu diesem Punkt überhaupt ein Dokument?
+   *
+   * `false` heißt: eine reine Erklärung. Für „ich zahle Mindestlohn" stellt
+   * keine Behörde eine Urkunde aus – ein Upload-Feld daneben wäre eine
+   * Aufforderung, die niemand erfüllen kann.
+   */
+  belegbar: boolean
+  /**
+   * Wortlaut, den der Betrieb mit dem Häkchen bestätigt.
+   *
+   * Nur bei reinen Erklärungen gesetzt – und dort zwingend: Eine Zustimmung
+   * ohne Text ist keine Erklärung, sondern ein Häkchen.
+   */
+  erklaerungstext?: string
 }
 
 export const ERKLAERUNG_TYPEN: ErklaerungTyp[] = [
-  { id: 'gewerbeanmeldung', label: 'Gewerbeanmeldung', pflicht: true },
-  { id: 'haftpflicht', label: 'Haftpflichtversicherung', pflicht: true },
-  { id: 'meisterbrief', label: 'Meisterbrief / Fachkundenachweis', pflicht: false },
-  { id: 'handwerksrolle', label: 'Eintragung Handwerksrolle', pflicht: false },
-  { id: 'unbedenklichkeit', label: 'Steuerliche Unbedenklichkeitsbescheinigung', pflicht: false },
-  { id: 'sozialversicherung', label: 'Sozialversicherungsnachweis', pflicht: false },
+  { id: 'gewerbeanmeldung', label: 'Gewerbeanmeldung', pflicht: true, belegbar: true },
+  { id: 'haftpflicht', label: 'Haftpflichtversicherung', pflicht: true, belegbar: true },
+  { id: 'meisterbrief', label: 'Meisterbrief / Fachkundenachweis', pflicht: false, belegbar: true },
+  { id: 'handwerksrolle', label: 'Eintragung Handwerksrolle', pflicht: false, belegbar: true },
+  { id: 'unbedenklichkeit', label: 'Steuerliche Unbedenklichkeitsbescheinigung', pflicht: false, belegbar: true },
+  { id: 'sozialversicherung', label: 'Sozialversicherungsnachweis', pflicht: false, belegbar: true },
+  {
+    id: 'mindestlohn',
+    label: 'Mindestlohn und keine Schwarzarbeit',
+    // Bewusst freiwillig — wie im Web. Verbindlich wird die Zusage dort, wo sie
+    // hingehört: in den Vergabebedingungen des einzelnen Auftrags. Eine Pflicht
+    // im Profil machte alle registrierten Betriebe rückwirkend unvollständig
+    // und liesse /api/zuschlag/belege-pruefen ein Dokument nachfordern, das es
+    // zu dieser Erklärung nicht gibt.
+    pflicht: false,
+    belegbar: false,
+    // Kein Paragraf im Text: Die Fundstellen für Mindestlohn- und
+    // Schwarzarbeitsrecht liegen ausserhalb von UVgO und VOB/A und sind nicht
+    // am Volltext geprüft. Inhaltlich richtig, Fundstelle offen.
+    erklaerungstext:
+      'Ich erkläre, dass ich meinen Beschäftigten bei der Ausführung öffentlicher Aufträge '
+      + 'mindestens den gesetzlich vorgeschriebenen Mindestlohn zahle, dass ich meine Melde-, '
+      + 'Beitrags- und Steuerpflichten ordnungsgemäß erfülle und dass ich keine Schwarzarbeit '
+      + 'einsetze. Schreibt das Vergabegesetz meines Bundeslandes ein höheres Mindestentgelt '
+      + 'vor, halte ich dieses ein. Dasselbe verlange ich von Nachunternehmern, die ich für '
+      + 'die Ausführung einsetze.',
+  },
 ]
 
 /** Lesbares Label zu einer typ-id (Fallback: die id selbst). */

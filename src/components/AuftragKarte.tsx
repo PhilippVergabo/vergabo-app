@@ -9,6 +9,10 @@ export type AuftragItem = {
   titel: string
   gewerk: string | null
   vergabeverfahren: string | null
+  // Entscheidet die Verfahrensbezeichnung: „Freihändige Vergabe" (VOB/A) vs.
+  // „Verhandlungsvergabe" (UVgO). Optional, weil Bestandsaufträge sie nicht
+  // zwingend tragen — ohne Angabe gilt die Bauleistung.
+  leistungsart?: string | null
   ausfuehrungsort_plz: string | null
   ausfuehrungsort_ort: string | null
   ausfuehrungsort_lat?: number | null
@@ -45,7 +49,7 @@ export function AuftragKarte({ auftrag, beworben, eingeladen, angebotPreis, onPr
   const budget = formatBudget(auftrag.budget_max)
   const frist = formatDate(auftrag.frist)
   const ort = [auftrag.ausfuehrungsort_plz, auftrag.ausfuehrungsort_ort].filter(Boolean).join(' ')
-  const verfahren = verfahrenLabel(auftrag.vergabeverfahren)
+  const verfahren = verfahrenLabel(auftrag.vergabeverfahren, auftrag.leistungsart)
 
   // Karteninhalt zu einer Vorlese-Beschriftung zusammenfassen (Screenreader liest
   // die Karte als eine Einheit statt als lose Einzeltexte).
