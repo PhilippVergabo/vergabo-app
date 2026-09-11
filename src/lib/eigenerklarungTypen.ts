@@ -7,6 +7,15 @@ export interface ErklaerungTyp {
   label: string
   pflicht: boolean
   /**
+   * Kann dieser Nachweis ablaufen?
+   *
+   * Steuert, ob zu ihm überhaupt ein Ablaufdatum erwartet wird. Eine
+   * Gewerbeanmeldung läuft nicht ab, eine Haftpflichtpolice schon. Das Feld
+   * fehlte hier bis 11.09.2026 — die App las `gueltig_bis` gar nicht, obwohl
+   * der Cron eine Push-Nachricht „Nachweis läuft bald ab" verschickt.
+   */
+  kannAblaufen: boolean
+  /**
    * Gibt es zu diesem Punkt überhaupt ein Dokument?
    *
    * `false` heißt: eine reine Erklärung. Für „ich zahle Mindestlohn" stellt
@@ -24,12 +33,12 @@ export interface ErklaerungTyp {
 }
 
 export const ERKLAERUNG_TYPEN: ErklaerungTyp[] = [
-  { id: 'gewerbeanmeldung', label: 'Gewerbeanmeldung', pflicht: true, belegbar: true },
-  { id: 'haftpflicht', label: 'Haftpflichtversicherung', pflicht: true, belegbar: true },
-  { id: 'meisterbrief', label: 'Meisterbrief / Fachkundenachweis', pflicht: false, belegbar: true },
-  { id: 'handwerksrolle', label: 'Eintragung Handwerksrolle', pflicht: false, belegbar: true },
-  { id: 'unbedenklichkeit', label: 'Steuerliche Unbedenklichkeitsbescheinigung', pflicht: false, belegbar: true },
-  { id: 'sozialversicherung', label: 'Sozialversicherungsnachweis', pflicht: false, belegbar: true },
+  { id: 'gewerbeanmeldung', label: 'Gewerbeanmeldung', pflicht: true, kannAblaufen: false, belegbar: true },
+  { id: 'haftpflicht', label: 'Haftpflichtversicherung', pflicht: true, kannAblaufen: true, belegbar: true },
+  { id: 'meisterbrief', label: 'Meisterbrief / Fachkundenachweis', pflicht: false, kannAblaufen: false, belegbar: true },
+  { id: 'handwerksrolle', label: 'Eintragung Handwerksrolle', pflicht: false, kannAblaufen: false, belegbar: true },
+  { id: 'unbedenklichkeit', label: 'Steuerliche Unbedenklichkeitsbescheinigung', pflicht: false, kannAblaufen: true, belegbar: true },
+  { id: 'sozialversicherung', label: 'Sozialversicherungsnachweis', pflicht: false, kannAblaufen: true, belegbar: true },
   {
     id: 'mindestlohn',
     label: 'Mindestlohn und keine Schwarzarbeit',
@@ -39,6 +48,7 @@ export const ERKLAERUNG_TYPEN: ErklaerungTyp[] = [
     // und liesse /api/zuschlag/belege-pruefen ein Dokument nachfordern, das es
     // zu dieser Erklärung nicht gibt.
     pflicht: false,
+    kannAblaufen: false,
     belegbar: false,
     // Kein Paragraf im Text: Die Fundstellen für Mindestlohn- und
     // Schwarzarbeitsrecht liegen ausserhalb von UVgO und VOB/A und sind nicht

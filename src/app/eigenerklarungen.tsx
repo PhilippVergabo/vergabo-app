@@ -19,6 +19,7 @@ import {
   sanitizeDateiname,
   validiereEigenerklarungDatei,
 } from '@/lib/eigenerklarungTypen'
+import { datumDe, gueltigkeitsHinweis, gueltigkeitsStatus, heuteBerlin } from '@/lib/nachweisGueltigkeit'
 import { C } from '@/lib/theme'
 
 // Spiegel von vergabo/app/dashboard/anbieter/eigenerklarungen (Web):
@@ -35,6 +36,7 @@ type Erklaerung = {
   bestaetigt: boolean | null
   admin_verifiziert: boolean | null
   admin_abgelehnt: boolean | null
+  gueltig_bis: string | null
 }
 
 /**
@@ -55,6 +57,24 @@ const IST_DOPPELTER_EINTRAG = (fehler: { code?: string }) => fehler.code === '23
 
 function dbFehlerText(fehler: { message?: string }): string {
   return fehler.message ?? 'Der Eintrag konnte nicht gespeichert werden. Bitte erneut versuchen.'
+}
+
+function ablaufStatus(e: Erklaerung | undefined) {
+  return gueltigkeitsStatus(e?.gueltig_bis, heuteBerlin())
+}
+
+/**
+ * Ein Satz zur Gueltigkeit — auch dann, wenn kein Datum hinterlegt ist.
+ *
+ * Das Schweigen waere hier die schlechtere Auskunft: Wer die Push „Nachweis
+ * laeuft bald ab" bekommt, muss sehen koennen, welcher Nachweis ein Datum hat
+ * und welcher keines.
+ */
+function gueltigText(e: Erklaerung | undefined): string {
+  if (!e?.gueltig_bis) return 'Gültig bis: nicht hinterlegt (im Browser ergänzbar)'
+  const datum = datumDe(e.gueltig_bis)
+  const hinweis = gueltigkeitsHinweis(e.gueltig_bis, heuteBerlin())
+  return hinweis ? `Gültig bis ${datum} · ${hinweis}` : `Gültig bis ${datum}`
 }
 
 function StatusBadge({ e }: { e: Erklaerung | undefined }) {
@@ -83,7 +103,7 @@ export default function EigenerklarungenScreen() {
     if (!pid) return
     const { data } = await supabase
       .from('eigenerklarungen')
-      .select('id, typ, dateiname, bestaetigt, admin_verifiziert, admin_abgelehnt')
+      .select('id, typ, dateiname, bestaetigt, admin_verifiziert, admin_abgelehnt, gueltig_bis')
       .eq('anbieter_id', pid)
     setErklaerungen((data as Erklaerung[]) ?? [])
   }, [])
@@ -167,7 +187,12 @@ export default function EigenerklarungenScreen() {
       const { error: dbErr } = bestehend
         ? await supabase
             .from('eigenerklarungen')
-            .update({ dateiname: sicherName, bestaetigt: true })
+            // gueltig_bis wird geleert: Das Datum gehoerte zum ALTEN Dokument.
+            // Stehen zu lassen hiesse, die neue Police mit der Laufzeit der
+            // alten zu beschriften — die App kann kein Datum erfassen, das
+            // ergaenzt der Betrieb im Browser. Kein Datum ist ehrlicher als
+            // ein falsches; die Anzeige sagt das auch so.
+            .update({ dateiname: sicherName, bestaetigt: true, gueltig_bis: null })
             .eq('id', bestehend.id)
         : await supabase
             .from('eigenerklarungen')
@@ -260,6 +285,21 @@ export default function EigenerklarungenScreen() {
                 <Text style={styles.typLabel}>{typ.label}</Text>
                 {typ.pflicht ? <Text style={styles.pflicht}>Pflichtnachweis</Text> : null}
                 {e?.dateiname ? <Text style={styles.dateiname}>📎 {e.dateiname}</Text> : null}
+                {/* Gueltigkeit — nur Anzeige. Der Cron pusht „Nachweis laeuft
+                    bald ab"; ohne diese Zeile stand der Betrieb danach vor
+                    einer Liste, die nicht verriet, welcher Nachweis gemeint
+                    ist. Gesetzt und geaendert wird das Datum im Browser. */}
+                {typ.kannAblaufen || e?.gueltig_bis ? (
+                  <Text
+                    style={[
+                      styles.gueltigkeit,
+                      ablaufStatus(e) === 'abgelaufen' && styles.gueltigkeitAbgelaufen,
+                      ablaufStatus(e) === 'laeuft_ab' && styles.gueltigkeitLaeuftAb,
+                    ]}
+                  >
+                    {gueltigText(e)}
+                  </Text>
+                ) : null}
               </View>
               <StatusBadge e={e} />
             </View>
@@ -340,6 +380,9 @@ const styles = StyleSheet.create({
   typLabel: { fontSize: 15, fontWeight: '600', color: C.text },
   pflicht: { fontSize: 11, fontWeight: '700', color: C.accent, textTransform: 'uppercase' },
   dateiname: { fontSize: 12, color: C.muted, marginTop: 2 },
+  gueltigkeit: { fontSize: 12, color: C.muted, marginTop: 2 },
+  gueltigkeitLaeuftAb: { color: C.accent, fontWeight: '600' },
+  gueltigkeitAbgelaufen: { color: '#7a3320', fontWeight: '700' },
   badge: {
     fontSize: 11,
     fontWeight: '700',
