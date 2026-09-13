@@ -289,7 +289,7 @@ export default function BewerbenScreen() {
           Für diese Ausschreibung können keine Angebote (mehr) abgegeben werden – die Frist ist
           abgelaufen oder sie ist nicht mehr veröffentlicht.
         </Text>
-        <Pressable style={styles.submitBtn} onPress={() => router.replace(`/auftraege/${id}`)}>
+        <Pressable style={styles.submitBtn} onPress={() => router.dismissTo(`/auftraege/${id}`)}>
           <Text style={styles.submitText}>Zurück zur Ausschreibung</Text>
         </Pressable>
       </View>
@@ -304,10 +304,15 @@ export default function BewerbenScreen() {
         <Text style={styles.successText}>
           Der Auftraggeber prüft Ihr Angebot und meldet sich bei Ihnen.
         </Text>
-        <Pressable style={styles.submitBtn} onPress={() => router.replace('/')}>
+        {/* dismissTo statt replace: Das Ziel liegt bereits im Stack (wir sind ja
+            von dort gekommen). replace legte einen ZWEITEN Eintrag derselben
+            Route an — der native Zurück-Button sprang dann auf einen optisch
+            identischen Screen und wirkte tot. dismissTo springt zum vorhandenen
+            Eintrag zurück und ersetzt nur dann, wenn es ihn nicht gibt. */}
+        <Pressable style={styles.submitBtn} onPress={() => router.dismissTo('/')}>
           <Text style={styles.submitText}>Zurück zur Übersicht</Text>
         </Pressable>
-        <AutoZurueck onAblauf={() => router.replace('/')} />
+        <AutoZurueck onAblauf={() => router.dismissTo('/')} />
       </View>
     )
   }
