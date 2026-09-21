@@ -1,5 +1,4 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { budgetRange } from '@/lib/budgetRange'
 import { fmtPreis } from '@/lib/bewerbung'
 import { gewerkLabel, verfahrenLabel } from '@/lib/labels'
 import { C } from '@/lib/theme'
@@ -18,7 +17,10 @@ export type AuftragItem = {
   ausfuehrungsort_lat?: number | null
   ausfuehrungsort_lon?: number | null
   frist: string | null
-  budget_max: number | null
+  // Budgetstufe, z. B. „10.000 – 25.000 €" — kommt von der Web-Plattform
+  // (src/lib/auftragOeffentlich.ts). Nie der Betrag: `budget_bis` liest die
+  // App seit dem Sicherheits-Audit 09/2026 nicht mehr.
+  budget_label?: string | null
   created_at: string
 }
 
@@ -39,14 +41,8 @@ function formatDate(iso: string | null) {
   })
 }
 
-function formatBudget(max: number | null) {
-  // Anbieter sehen nur die grobe Budget-Klasse (Basis budget_bis), nie exakte Werte.
-  if (max == null) return null
-  return budgetRange(max)
-}
-
 export function AuftragKarte({ auftrag, beworben, eingeladen, angebotPreis, onPress }: Props) {
-  const budget = formatBudget(auftrag.budget_max)
+  const budget = auftrag.budget_label ?? null
   const frist = formatDate(auftrag.frist)
   const ort = [auftrag.ausfuehrungsort_plz, auftrag.ausfuehrungsort_ort].filter(Boolean).join(' ')
   const verfahren = verfahrenLabel(auftrag.vergabeverfahren, auftrag.leistungsart)

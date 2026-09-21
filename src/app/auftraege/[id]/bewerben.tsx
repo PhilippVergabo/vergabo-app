@@ -28,6 +28,7 @@ import {
   type Position,
 } from '@/lib/bewerbung'
 import { authedFetch } from '@/lib/authedFetch'
+import { ladeBieteransicht } from '@/lib/auftragOeffentlich'
 import { AutoZurueck } from '@/components/AutoZurueck'
 import { C } from '@/lib/theme'
 
@@ -69,17 +70,21 @@ export default function BewerbenScreen() {
     let aktiv = true
 
     async function laden() {
-      const { data } = await supabase
-        .from('auftraege')
-        .select(
-          'status, angebotsfrist, eignungskriterien, verpflichtungserklaerungen, hat_leistungsverzeichnis, leistungsverzeichnis, kostenschaetzung, bindefrist, ausfuehrung_von, ausfuehrung_bis',
-        )
-        .eq('id', id)
-        .single()
-      if (!aktiv || !data) {
+      // Über die Web-Plattform statt direkt aus `auftraege`: Die Bieteransicht
+      // liefert die Positionsvorlage OHNE Preise und nie die Kalkulation der
+      // Vergabestelle (src/lib/auftragOeffentlich.ts).
+      const ergebnis = await ladeBieteransicht(id)
+      if (!aktiv) return
+      if (ergebnis.art === 'nicht_veroeffentlicht') {
+        setNichtMoeglich(true)
         setLoading(false)
         return
       }
+      if (ergebnis.art === 'fehler') {
+        setLoading(false)
+        return
+      }
+      const data = ergebnis.auftrag
 
       // Abgabe nur bei veröffentlichter Ausschreibung und vor Fristablauf —
       // schützt auch beim direkten Aufruf (Deep-Link), nicht nur über den Button.
@@ -111,28 +116,16 @@ export default function BewerbenScreen() {
       setVerpflichtungenBestaetigt(verpfl.map(() => false))
 
       const lvPos = (data.leistungsverzeichnis ?? []) as LvPosition[]
-      const ksPos = (data.kostenschaetzung ?? []) as {
-        id?: string | number
-        beschreibung?: string
-        menge?: number
-        einheit?: string
-      }[]
+      // Bereits ohne Preise und mit der ID-Regel String(p.id ?? i + 1) — der
+      // Bearbeiten-Screen sperrt genau diese IDs.
+      const vorlage = data.positionenVorlage
 
       if (data.hat_leistungsverzeichnis && lvPos.length > 0) {
         setHatLv(true)
         setLvPositionen(lvPos)
-      } else if (ksPos.length > 0) {
+      } else if (vorlage.length > 0) {
         // Positionen des Auftraggebers als Startliste — OHNE dessen Preise.
-        setAgPositionen(
-          ksPos.map((p, i) => ({
-            id: String(p.id ?? i + 1),
-            beschreibung: p.beschreibung ?? '',
-            menge: Number(p.menge) || 1,
-            einheit: p.einheit ?? 'Stück',
-            einzelpreis: 0,
-            gesamt: 0,
-          })),
-        )
+        setAgPositionen(vorlage.map((p) => ({ ...p, einzelpreis: 0, gesamt: 0 })))
       }
 
       // Anbieter-Profil + verifizierte Eigenerklärungen für Profil-Abgleich

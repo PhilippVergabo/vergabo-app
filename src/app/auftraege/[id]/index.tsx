@@ -16,7 +16,7 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 // sauberem Hinweis, falls der Build die Module noch nicht enthält.
 import { supabase } from '@/lib/supabase'
 import { authedFetch } from '@/lib/authedFetch'
-import { budgetRange } from '@/lib/budgetRange'
+import { ladeBudgetstufen } from '@/lib/auftragOeffentlich'
 import { dateiWaehlen, type PickedFile } from '@/lib/bewerbung'
 import { sanitizeDateiname } from '@/lib/eigenerklarungTypen'
 import { gewerkLabel } from '@/lib/labels'
@@ -33,7 +33,6 @@ type AuftragDetail = {
   ausfuehrungsort_plz: string | null
   ausfuehrungsort_ort: string | null
   frist: string | null
-  budget_max: number | null
   status: string
 }
 
@@ -87,15 +86,18 @@ export default function AuftragDetailScreen() {
     sterne: number
     kommentar: string | null
   } | null>(null)
+  // Budgetstufe von der Web-Plattform (nur veröffentlichte Aufträge), nie der
+  // Betrag — `budget_bis` liest die App seit dem Sicherheits-Audit nicht mehr.
+  const [budgetText, setBudgetText] = useState<string | null>(null)
   const scrollRef = useRef<ScrollView>(null)
 
   const laden = useCallback(async () => {
     if (!id) return
-    const [{ data: a }, { data: b }, { data: bw }] = await Promise.all([
+    const [{ data: a }, { data: b }, { data: bw }, stufen] = await Promise.all([
       supabase
         .from('auftraege')
         .select(
-          'id, titel, beschreibung, gewerk, ausfuehrungsort_adresse, ausfuehrungsort_plz, ausfuehrungsort_ort, frist:angebotsfrist, budget_max:budget_bis, status',
+          'id, titel, beschreibung, gewerk, ausfuehrungsort_adresse, ausfuehrungsort_plz, ausfuehrungsort_ort, frist:angebotsfrist, status',
         )
         .eq('id', id)
         .single(),
@@ -108,8 +110,10 @@ export default function AuftragDetailScreen() {
         .neq('status', 'zurueckgezogen')
         .limit(1),
       supabase.from('bewertungen').select('sterne, kommentar').eq('auftrag_id', id).maybeSingle(),
+      ladeBudgetstufen([id]),
     ])
     setAuftrag(a as AuftragDetail | null)
+    setBudgetText(stufen[id] ?? null)
     const meine = (b ?? [])[0] as { id: string; status: string } | undefined
     setMeineBewerbung(meine ?? null)
     setErhalteneBewertung((bw as { sterne: number; kommentar: string | null } | null) ?? null)
@@ -323,8 +327,6 @@ export default function AuftragDetailScreen() {
   // Adresse fallen auf "PLZ Ort" zurück.
   const plzOrt = [auftrag.ausfuehrungsort_plz, auftrag.ausfuehrungsort_ort].filter(Boolean).join(' ')
   const ort = [auftrag.ausfuehrungsort_adresse, plzOrt].filter(Boolean).join(', ')
-  // Anbieter sehen nur die grobe Budget-Klasse (Basis budget_bis), nie exakte Werte.
-  const budgetText = auftrag.budget_max != null ? budgetRange(auftrag.budget_max) : null
   // Angebote nur möglich, solange veröffentlicht UND die Angebotsfrist nicht
   // abgelaufen ist (konsistent zum Bearbeiten-Flow).
   const fristAbgelaufen = auftrag.frist ? new Date() >= new Date(auftrag.frist) : false

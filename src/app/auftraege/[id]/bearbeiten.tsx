@@ -28,6 +28,7 @@ import {
   type Position,
 } from '@/lib/bewerbung'
 import { authedFetch } from '@/lib/authedFetch'
+import { ladeBieteransicht } from '@/lib/auftragOeffentlich'
 import { AutoZurueck } from '@/components/AutoZurueck'
 import { C } from '@/lib/theme'
 
@@ -84,13 +85,11 @@ export default function BewerbungBearbeitenScreen() {
     let aktiv = true
 
     async function laden() {
-      const { data: auftrag } = await supabase
-        .from('auftraege')
-        .select(
-          'eignungskriterien, verpflichtungserklaerungen, status, angebotsfrist, hat_leistungsverzeichnis, leistungsverzeichnis, kostenschaetzung, bindefrist',
-        )
-        .eq('id', id)
-        .single()
+      // Über die Web-Plattform statt direkt aus `auftraege` (Kalkulation der
+      // Vergabestelle bleibt dort; src/lib/auftragOeffentlich.ts). Nicht
+      // veröffentlicht oder nicht erreichbar → nicht bearbeitbar, wie bisher.
+      const ergebnis = await ladeBieteransicht(id)
+      const auftrag = ergebnis.art === 'ok' ? ergebnis.auftrag : null
 
       const fristAbgelaufen = auftrag?.angebotsfrist
         ? new Date() >= new Date(auftrag.angebotsfrist as string)
@@ -175,9 +174,9 @@ export default function BewerbungBearbeitenScreen() {
         // Gesperrt werden NUR die AG-Positionen — IDs mit demselben Mapping wie
         // der Seed im Bewerben-Screen (String(p.id ?? i + 1)), damit selbst
         // ergänzte Positionen editierbar bleiben.
-        const ksPos = (auftrag.kostenschaetzung ?? []) as { id?: string | number }[]
-        setPositionenVorgegeben(ksPos.length > 0)
-        setVorgegebeneIds(ksPos.map((p, i) => String(p.id ?? i + 1)))
+        const vorlage = auftrag.positionenVorlage
+        setPositionenVorgegeben(vorlage.length > 0)
+        setVorgegebeneIds(vorlage.map((p) => p.id))
       }
 
       // Vorhandene Nachweise (Quelle/Pfad) aus der gespeicherten Bewerbung

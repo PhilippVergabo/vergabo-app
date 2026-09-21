@@ -105,7 +105,6 @@ darunter eine rechtlich relevante Verfahrensbezeichnung.
 | `src/lib/labels.ts` → `verfahrenLabel` | `lib/verfahren.ts` | Bezeichnung hängt an der **Leistungsart**: „Freihändige Vergabe" (VOB/A) vs. „Verhandlungsvergabe" (UVgO) |
 | `src/lib/bewerbung.ts` → `EINHEITEN` | `lib/einheiten.ts` | Liste UND Reihenfolge — die App schaltet per Tippen durch |
 | `src/lib/eigenerklarungTypen.ts` | `lib/eigenerklarungTypen.ts` | Neue Typen, `pflicht`/`kannAblaufen`/`belegbar` |
-| `src/lib/budgetRange.ts` | `lib/budgetRange.ts` | Stufen — **und das geschützte Leerzeichen** vor dem Euro-Zeichen (U+00A0, DIN 5008) |
 | `src/lib/nachweisGueltigkeit.ts` | `lib/nachweisGueltigkeit.ts` | Warnfenster (30 Tage), Statusnamen, Hinweistexte |
 | `src/lib/labels.ts` → `GEWERK_LABELS` | `lib/gewerke.ts` | Schlüssel und Labels |
 
@@ -113,8 +112,27 @@ darunter eine rechtlich relevante Verfahrensbezeichnung.
 schneller Abgleich:
 
 ```bash
-diff ../vergabo/lib/budgetRange.ts src/lib/budgetRange.ts
+diff ../vergabo/lib/eigenerklarungTypen.ts src/lib/eigenerklarungTypen.ts
 ```
+
+⛔ **Die interne Kalkulation liest die App NIE direkt** (seit 21.09.2026).
+`budget_von`, `budget_bis`, `haushaltsstelle` und `kostenschaetzung` in
+`auftraege` sind die Kalkulation der Vergabestelle — `budget_bis` ist meist die
+exakte Summe der Kostenschätzung, nicht die veröffentlichte Stufe. Das
+Sicherheits-Audit des Web-Repos entzieht dem Browser diese Spalten
+(`../vergabo/docs/sicherheits-audit-migrationen.sql`, Schritt 2), und ein
+fehlendes Spaltenrecht lässt in Postgres die **ganze** Abfrage scheitern, nicht
+nur die Spalte. Die App las bis zu diesem Tag `budget_bis` (Startliste,
+Auftragsdetail) und `kostenschaetzung` (Angebot abgeben/bearbeiten) direkt — nach
+dem Entzug wären genau diese Bildschirme tot gewesen. Seither:
+
+- Budgetstufe über `/api/auftrag/budgetstufen` (eine Anfrage für die ganze Liste),
+- Auftrag + Positionsvorlage **ohne Preise** über `/api/auftrag/bieteransicht/[id]`,
+
+beides gekapselt in `src/lib/auftragOeffentlich.ts`. Die eigene Kopie
+`src/lib/budgetRange.ts` ist entfallen — die Stufen gibt es nur noch im Web, eine
+doppelt gehaltene Regel weniger. **Wer eine neue Abfrage auf `auftraege`
+schreibt, fordert keine dieser vier Spalten an.**
 
 ⚠️ **Eine Push-Nachricht ohne Gegenstück in der App ist auch Drift.** Am
 11.09.2026 gefunden: Der Cron verschickt „📄 Nachweis läuft bald ab – bitte

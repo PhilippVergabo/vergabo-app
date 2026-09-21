@@ -14,6 +14,7 @@ import { useRouter, useFocusEffect, type Href } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { AuftragKarte, type AuftragItem } from '@/components/AuftragKarte'
+import { ladeBudgetstufen } from '@/lib/auftragOeffentlich'
 import { addPushTapListener, registriereFuerPush } from '@/lib/push'
 import { gewerkLabel } from '@/lib/labels'
 import { haversineKm, plzKoordinaten } from '@/lib/geo'
@@ -119,7 +120,7 @@ export function AnbieterHome() {
       supabase
         .from('auftraege')
         .select(
-          'id, titel, gewerk, vergabeverfahren, leistungsart, ausfuehrungsort_plz, ausfuehrungsort_ort, ausfuehrungsort_lat, ausfuehrungsort_lon, frist:angebotsfrist, budget_max:budget_bis, created_at:erstellt_am',
+          'id, titel, gewerk, vergabeverfahren, leistungsart, ausfuehrungsort_plz, ausfuehrungsort_ort, ausfuehrungsort_lat, ausfuehrungsort_lon, frist:angebotsfrist, created_at:erstellt_am',
         )
         .eq('status', 'veroeffentlicht')
         .order('erstellt_am', { ascending: false }),
@@ -156,7 +157,10 @@ export function AnbieterHome() {
       const abgelaufen = a.frist ? new Date(a.frist).getTime() < jetzt : false
       return !abgelaufen || angebote.has(a.id)
     })
-    setAuftraege(sichtbar)
+    // Budgetstufe je Karte von der Web-Plattform, ein Aufruf für die ganze
+    // Liste — nie der Betrag. Nicht-fatal: ohne Antwort fehlt die Stufe.
+    const stufen = await ladeBudgetstufen(sichtbar.map((a) => a.id))
+    setAuftraege(sichtbar.map((a) => ({ ...a, budget_label: stufen[a.id] ?? null })))
     setMeineAngebote(angebote)
     setEinladungen(new Set((einladungenData ?? []).map((e) => e.auftrag_id)))
     setVerifiziert(profilData?.verifiziert ?? null)
