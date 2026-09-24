@@ -81,6 +81,15 @@ function StatusBadge({ e }: { e: Erklaerung | undefined }) {
   if (!e || (!e.bestaetigt && !e.dateiname)) {
     return <Text style={[styles.badge, styles.badgeFehlt]}>fehlt</Text>
   }
+  // Eigenerklärung ohne Datei: Daran kann ein Admin nichts prüfen — es gibt
+  // kein Dokument. Der Web-Admin blendet solche Einträge aus der Prüfliste aus,
+  // und /api/app-admin/anbieter zählt sie nicht mit (siehe auch
+  // components/admin/NachweisBadge.tsx). Hier stand trotzdem „⏳ in Prüfung":
+  // ein Wartezustand, der nie endet. Der Betrieb hat alles getan, was er tun
+  // kann — das sagt der Badge jetzt.
+  if (!e.dateiname) {
+    return <Text style={[styles.badge, styles.badgeErklaerung]}>✓ bestätigt</Text>
+  }
   if (e.admin_verifiziert) {
     return <Text style={[styles.badge, styles.badgeOk]}>✓ freigegeben</Text>
   }
@@ -392,6 +401,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   badgeFehlt: { backgroundColor: C.field, color: C.muted },
+  // Bewusst nicht das Grün von „freigegeben": Freigegeben hat hier niemand,
+  // die Erklärung steht für sich.
+  badgeErklaerung: { backgroundColor: '#f0efe9', color: C.muted },
   badgeOk: { backgroundColor: C.ok, color: C.primary },
   badgeWartet: { backgroundColor: C.warn, color: C.accent },
   badgeAbgelehnt: { backgroundColor: '#f7e3df', color: '#7a3320' },

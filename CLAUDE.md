@@ -143,6 +143,8 @@ die Gültigkeit jetzt an (nur Anzeige, gesetzt wird sie im Browser). **Beim
 Anlegen eines neuen Benachrichtigungstyps im Web mitdenken, ob die App zeigen
 kann, worum es geht** — sie empfängt jede In-App-Benachrichtigung als Push.
 
+⚠️ **„Eigenerklärung ohne Datei" ist überall derselbe Sonderfall — an drei Stellen.** Ein angehakter Nachweis ohne hochgeladenes Dokument kann von niemandem geprüft werden; die Erklärung selbst ist der Nachweis. Deshalb: `components/admin/NachweisBadge.tsx` (`istOffenerNachweis` — kein Badge „in Prüfung", keine Freigabe-Knöpfe, nicht mitgezählt), `src/app/eigenerklarungen.tsx` (Anbieter-Sicht: „✓ bestätigt" statt „⏳ in Prüfung" — sonst wartet der Betrieb auf einen Zustand, der nie eintritt; seit 24.09.2026), und im Web `/api/app-admin/anbieter` (`.not('dateiname','is',null)` bei der Zählung) plus `/api/app-admin/eigenerklarungen` (Feld `pruefung_noetig`). **Wer eine dieser Stellen anfasst, prüft die anderen mit.**
+
 ⚠️ **Beim Ersetzen einer Datei leert die App `gueltig_bis`.** Das Datum gehörte
 zum alten Dokument; stehen zu lassen hieße, die neue Police mit der Laufzeit der
 alten zu beschriften. Die App kann kein Datum erfassen (dafür bräuchte es einen
