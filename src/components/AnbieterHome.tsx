@@ -141,7 +141,7 @@ export function AnbieterHome() {
     ])
 
     if (auftraegeError) {
-      setError(auftraegeError.message)
+      setError('Ausschreibungen konnten nicht geladen werden. Bitte erneut versuchen.')
       return
     }
     setError(null)

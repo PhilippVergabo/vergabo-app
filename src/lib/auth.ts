@@ -1,6 +1,6 @@
 import { Alert } from 'react-native'
-import AsyncStorage from '@react-native-async-storage/async-storage'
-import { supabase, SUPABASE_STORAGE_KEY } from '@/lib/supabase'
+import { loeschePushToken } from '@/lib/push'
+import { loescheSitzungsStorage, supabase } from '@/lib/supabase'
 
 /**
  * Abmelden — auch ohne Netz.
@@ -16,6 +16,11 @@ import { supabase, SUPABASE_STORAGE_KEY } from '@/lib/supabase'
  * erneut abmelden: Der zweite Aufruf findet keine Sitzung mehr, überspringt den
  * Server-Call und feuert `SIGNED_OUT` — der Auth-Gate navigiert wie gewohnt.
  *
+ * Vor dem Sign-Out wird der Expo-Push-Token im Profil geleert, damit nach dem
+ * Abmelden keine Pushes mehr auf diesem Gerät landen. Scheitert das (offline),
+ * bleibt der Token serverseitig stehen — bewusst akzeptiert, analog zum
+ * nicht widerrufenen Refresh-Token.
+ *
  * Bewusste Abwägung: Das Sitzungs-Token wird dabei serverseitig nicht widerrufen
  * (das geht offline nicht) und bleibt bis zum Ablauf gültig. Auf dem Gerät ist es
  * jedoch gelöscht — das ist es, was der Nutzer mit „Abmelden" bezweckt. Die
@@ -23,11 +28,13 @@ import { supabase, SUPABASE_STORAGE_KEY } from '@/lib/supabase'
  * Willen eingeloggt zu lassen, wäre aber das schlechtere Verhalten.
  */
 export async function abmelden(): Promise<void> {
+  await loeschePushToken()
+
   const { error } = await supabase.auth.signOut()
   if (!error) return
 
   try {
-    await AsyncStorage.removeItem(SUPABASE_STORAGE_KEY)
+    await loescheSitzungsStorage()
     await supabase.auth.signOut()
   } catch {
     // Selbst das lokale Verwerfen ist fehlgeschlagen — sonst bliebe der Tap

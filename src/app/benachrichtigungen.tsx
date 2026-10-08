@@ -30,9 +30,11 @@ type Benachrichtigung = {
 // Deeplinks aus Benachrichtigungen auf die App-Route normalisieren:
 // Aus jedem Link-Format (auch Web-Varianten wie
 // /login?next=%2Fauftraege%2F<uuid>%23rueckfragen oder /auftraege/<uuid>#anker)
-// wird die Auftrags-UUID extrahiert → /auftraege/<uuid>. Links ohne
-// Auftragsbezug (z. B. /dashboard) werden ignoriert (nur als gelesen markiert).
+// wird die Auftrags-UUID extrahiert → /auftraege/<uuid>. Nachweis-/Ablauf-
+// Hinweise landen auf /eigenerklarungen. Links ohne erlaubten Bezug
+// (z. B. /dashboard) werden ignoriert (nur als gelesen markiert).
 const AUFTRAG_LINK = /\/auftraege\/([0-9a-f-]{36})/
+const NACHWEIS_LINK = /eigenerklaerungen|nachweis/i
 
 function appZiel(link: string | null): string | null {
   if (!link) return null
@@ -43,7 +45,9 @@ function appZiel(link: string | null): string | null {
     // ungültige Kodierung → Rohwert prüfen
   }
   const treffer = dekodiert.match(AUFTRAG_LINK)
-  return treffer ? `/auftraege/${treffer[1]}` : null
+  if (treffer) return `/auftraege/${treffer[1]}`
+  if (NACHWEIS_LINK.test(dekodiert)) return '/eigenerklarungen'
+  return null
 }
 
 /** Relativer Zeitstempel („vor 5 Min.") bzw. Datum für ältere Einträge. */

@@ -179,7 +179,10 @@ export default function AuftragDetailScreen() {
             contentType: file.mimeType ?? 'application/octet-stream',
           })
         if (error) {
-          Alert.alert('Upload fehlgeschlagen', `${file.name}: ${error.message}`)
+          Alert.alert(
+            'Upload fehlgeschlagen',
+            `${file.name}: Die Datei konnte nicht hochgeladen werden. Bitte erneut versuchen.`,
+          )
           return
         }
         const ver = await authedFetch('/api/datei-verifizieren', {
@@ -187,8 +190,10 @@ export default function AuftragDetailScreen() {
           body: JSON.stringify({ bucket: 'bewerbung-anhaenge', pfad }),
         })
         if (!ver.ok) {
-          const j = (await ver.json().catch(() => ({}))) as { error?: string }
-          Alert.alert('Datei abgelehnt', j.error ?? `${file.name} hat die Prüfung nicht bestanden.`)
+          // Abgelehnte Datei entfernen — sonst bleibt sie im Bucket liegen und
+          // kann bei upsert eine zuvor gültige Datei am selben Pfad überschreiben.
+          await supabase.storage.from('bewerbung-anhaenge').remove([pfad]).catch(() => undefined)
+          Alert.alert('Datei abgelehnt', `${file.name} hat die Prüfung nicht bestanden.`)
           return
         }
         hochgeladeneNamen.push(sicherName)
@@ -206,8 +211,8 @@ export default function AuftragDetailScreen() {
       setNachgereicht((prev) => ({ ...prev, [nf.id]: true }))
       setNfDateien((prev) => ({ ...prev, [nf.id]: [] }))
       await laden()
-    } catch (e) {
-      Alert.alert('Verbindungsfehler', e instanceof Error ? e.message : String(e))
+    } catch {
+      Alert.alert('Verbindungsfehler', 'Die Unterlagen konnten nicht gesendet werden. Prüfen Sie Ihre Verbindung.')
     } finally {
       setNfBusy(null)
     }

@@ -19,6 +19,7 @@ import { NachweisSektion } from '@/components/angebot/NachweisSektion'
 import { VerpflichtungenSektion } from '@/components/angebot/VerpflichtungenSektion'
 import { sektionStyles } from '@/components/angebot/sektionStyles'
 import {
+  findePassendeEigenerklaerung,
   fmtPreis,
   toFormFile,
   type Kriterium,
@@ -44,6 +45,8 @@ export default function BewerbungBearbeitenScreen() {
   const router = useRouter()
 
   const [loading, setLoading] = useState(true)
+  const [ladenFehler, setLadenFehler] = useState(false)
+  const [ladenVersuch, setLadenVersuch] = useState(0)
   const [nichtBearbeitbar, setNichtBearbeitbar] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -85,17 +88,29 @@ export default function BewerbungBearbeitenScreen() {
     let aktiv = true
 
     async function laden() {
+      setLadenFehler(false)
+      setNichtBearbeitbar(false)
       // Über die Web-Plattform statt direkt aus `auftraege` (Kalkulation der
-      // Vergabestelle bleibt dort; src/lib/auftragOeffentlich.ts). Nicht
-      // veröffentlicht oder nicht erreichbar → nicht bearbeitbar, wie bisher.
+      // Vergabestelle bleibt dort; src/lib/auftragOeffentlich.ts).
       const ergebnis = await ladeBieteransicht(id)
-      const auftrag = ergebnis.art === 'ok' ? ergebnis.auftrag : null
+      if (!aktiv) return
+      // Netz-/Serverfehler ≠ „nicht bearbeitbar": eigenes UI mit Retry.
+      if (ergebnis.art === 'fehler') {
+        setLadenFehler(true)
+        setLoading(false)
+        return
+      }
+      if (ergebnis.art === 'nicht_veroeffentlicht') {
+        setNichtBearbeitbar(true)
+        setLoading(false)
+        return
+      }
+      const auftrag = ergebnis.auftrag
 
-      const fristAbgelaufen = auftrag?.angebotsfrist
+      const fristAbgelaufen = auftrag.angebotsfrist
         ? new Date() >= new Date(auftrag.angebotsfrist as string)
         : false
-      if (!aktiv) return
-      if (!auftrag || auftrag.status !== 'veroeffentlicht' || fristAbgelaufen) {
+      if (auftrag.status !== 'veroeffentlicht' || fristAbgelaufen) {
         setNichtBearbeitbar(true)
         setLoading(false)
         return
@@ -208,13 +223,7 @@ export default function BewerbungBearbeitenScreen() {
       const autoBest: Record<string, boolean> = {}
       const nachweisMap: Record<string, string | null> = {}
       for (const k of kriterien) {
-        const passend = eks?.find(
-          (e) =>
-            e.typ === k.id ||
-            (k.nachweis_typ && e.typ === k.nachweis_typ) ||
-            e.typ === k.text?.toLowerCase().replace(/\s+/g, '_') ||
-            k.text?.toLowerCase().includes(e.typ.toLowerCase()),
-        )
+        const passend = findePassendeEigenerklaerung(eks, k)
         if (k.nachweis_erforderlich) nachweisMap[k.id] = passend?.id ?? null
         else if (passend || vorhandeneMap[k.id]) autoBest[k.id] = true
       }
@@ -229,7 +238,7 @@ export default function BewerbungBearbeitenScreen() {
     return () => {
       aktiv = false
     }
-  }, [id])
+  }, [id, ladenVersuch])
 
   const pflichtKriterienErfuellt = eignungskriterien
     .filter((k) => k.pflicht)
@@ -336,6 +345,31 @@ export default function BewerbungBearbeitenScreen() {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={C.primary} size="large" />
+      </View>
+    )
+  }
+
+  if (ladenFehler) {
+    return (
+      <View style={[styles.center, { padding: 24, gap: 16 }]}>
+        <Text style={styles.successTitle}>Laden fehlgeschlagen</Text>
+        <Text style={styles.successText}>
+          Das Angebot konnte nicht geladen werden. Bitte prüfen Sie Ihre Verbindung und versuchen
+          Sie es erneut.
+        </Text>
+        <Pressable
+          style={styles.submitBtn}
+          onPress={() => {
+            setLoading(true)
+            setLadenVersuch((n) => n + 1)
+          }}
+          accessibilityRole="button"
+        >
+          <Text style={styles.submitText}>Erneut versuchen</Text>
+        </Pressable>
+        <Pressable onPress={() => router.dismissTo(`/auftraege/${id}`)} accessibilityRole="button">
+          <Text style={styles.gateHint}>Zurück zur Ausschreibung</Text>
+        </Pressable>
       </View>
     )
   }
