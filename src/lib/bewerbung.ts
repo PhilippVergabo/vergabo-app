@@ -87,6 +87,26 @@ export const NACHWEIS_TYP_LABELS: Record<string, string> = {
   sonstiges: 'Sonstiger Nachweis',
 }
 
+/**
+ * Eigenerklärung zum Eignungskriterium zuordnen — nur exakte Typ-/ID-Treffer.
+ *
+ * Früher gab es zusätzlich `k.text.includes(e.typ)`: kurze Typs (z. B. Teil-
+ * strings) konnten dann falsche Nachweise als „Aus Profil" markieren. Die
+ * sicheren Regeln sind: Kriterium-ID, expliziter `nachweis_typ`, oder der
+ * aus dem Text abgeleitete Snake-Case-Schlüssel.
+ */
+export function findePassendeEigenerklaerung<T extends { id: string; typ: string }>(
+  eks: T[] | null | undefined,
+  k: Kriterium,
+): T | undefined {
+  return eks?.find(
+    (e) =>
+      e.typ === k.id ||
+      (k.nachweis_typ != null && k.nachweis_typ !== '' && e.typ === k.nachweis_typ) ||
+      e.typ === k.text?.toLowerCase().replace(/\s+/g, '_'),
+  )
+}
+
 // ── Upload-Validierung (Client-Vorprüfung, identisch zur Web-Allowlist) ──────
 const MB = 1024 * 1024
 
@@ -153,8 +173,8 @@ export async function dateiWaehlen(): Promise<PickedFile | null> {
       return null
     }
     return file
-  } catch (e) {
-    Alert.alert('Dateiauswahl fehlgeschlagen', e instanceof Error ? e.message : String(e))
+  } catch {
+    Alert.alert('Dateiauswahl fehlgeschlagen', 'Die Datei konnte nicht ausgewählt werden. Bitte erneut versuchen.')
     return null
   }
 }

@@ -24,5 +24,7 @@ export function uebersetzeAuthFehler(error: AuthFehler): string {
     return 'Keine Verbindung zum Server. Bitte prüfen Sie Ihre Internetverbindung.'
   }
 
-  return msg || 'Es ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.'
+  // Unbekannte Codes/Meldungen nie roh anzeigen — Postgres-/GoTrue-Texte
+  // könnten Schema- oder Policy-Hinweise enthalten.
+  return 'Es ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.'
 }

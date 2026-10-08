@@ -77,6 +77,33 @@ export async function registriereFuerPush(
 }
 
 /**
+ * Entfernt den Expo-Push-Token aus Anbieter- und Auftraggeber-Profil.
+ * Aufruf vor dem Abmelden — sonst landen Pushes weiter auf dem Gerät.
+ * Non-fatal und auch offline unproblematisch (dann bleibt der Token stehen).
+ */
+export async function loeschePushToken(): Promise<void> {
+  try {
+    const { data: sess } = await supabase.auth.getSession()
+    const userId = sess.session?.user.id
+    if (!userId) return
+
+    const anbieterId = await meinAnbieterId(userId)
+    if (anbieterId) {
+      await supabase.from('anbieter_profile').update({ expo_push_token: null }).eq('id', anbieterId)
+    }
+    const auftraggeberId = await meinAuftraggeberId(userId)
+    if (auftraggeberId) {
+      await supabase
+        .from('auftraggeber_profile')
+        .update({ expo_push_token: null })
+        .eq('id', auftraggeberId)
+    }
+  } catch {
+    // non-fatal — Abmelden soll trotzdem weiterlaufen
+  }
+}
+
+/**
  * Registriert den Push-Token eines ADMINS über die Bearer-API der Web-Plattform
  * (admins-Tabelle ist nicht per RLS beschreibbar). Aufruf erst NACH dem
  * 2FA-Schritt im Admin-Bereich — die Route verlangt aal2. Non-fatal.
@@ -95,16 +122,16 @@ export async function registriereAdminPush(): Promise<void> {
   }
 }
 
-// Whitelist für Push-Deeplinks: ausschließlich Auftragsdetails
-// (/auftraege/<uuid>, optional mit Web-Anker wie #rueckfragen — der Anker wird
-// verworfen). Alles andere wird ignoriert, damit manipulierte
+// Whitelist für Push-Deeplinks: Auftragsdetails und Nachweisliste
+// (/auftraege/<uuid>, /eigenerklarungen; optional mit Web-Anker — der Anker
+// wird verworfen). Alles andere wird ignoriert, damit manipulierte
 // Notification-Daten keine beliebige Navigation auslösen können.
-const ERLAUBTER_PUSH_LINK = /^(\/auftraege\/[0-9a-f-]{36})(?:#[\w-]*)?$/
+const ERLAUBTER_PUSH_LINK = /^(\/auftraege\/[0-9a-f-]{36}|\/eigenerklarungen)(?:#[\w-]*)?$/
 
 /**
  * Registriert einen Listener für das Antippen einer Push-Nachricht.
  * Ruft onTap mit dem `link` aus den Notification-Daten auf, aber nur wenn er
- * der Whitelist entspricht (/auftraege/<uuid>). Gibt eine Cleanup-Funktion zurück.
+ * der Whitelist entspricht. Gibt eine Cleanup-Funktion zurück.
  */
 export function addPushTapListener(onTap: (link: string) => void): () => void {
   const sub = Notifications.addNotificationResponseReceivedListener((response) => {

@@ -124,7 +124,7 @@ export function AuftraggeberHome() {
       .order('erstellt_am', { ascending: false })
 
     if (auftraegeError) {
-      setError(auftraegeError.message)
+      setError('Ausschreibungen konnten nicht geladen werden. Bitte erneut versuchen.')
       return
     }
     setError(null)

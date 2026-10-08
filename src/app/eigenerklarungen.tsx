@@ -12,6 +12,7 @@ import { useFocusEffect } from 'expo-router'
 import * as DocumentPicker from 'expo-document-picker'
 import { supabase } from '@/lib/supabase'
 import { authedFetch } from '@/lib/authedFetch'
+import { meinAnbieterId } from '@/lib/mitgliedschaft'
 import {
   ERKLAERUNG_TYPEN,
   EIGENERKLARUNG_UPLOAD,
@@ -55,8 +56,9 @@ type Erklaerung = {
  */
 const IST_DOPPELTER_EINTRAG = (fehler: { code?: string }) => fehler.code === '23505'
 
-function dbFehlerText(fehler: { message?: string }): string {
-  return fehler.message ?? 'Der Eintrag konnte nicht gespeichert werden. Bitte erneut versuchen.'
+function dbFehlerText(_fehler: { message?: string }): string {
+  // Rohmeldungen von Postgres/Supabase nicht anzeigen — nur generischer Text.
+  return 'Der Eintrag konnte nicht gespeichert werden. Bitte erneut versuchen.'
 }
 
 function ablaufStatus(e: Erklaerung | undefined) {
@@ -106,8 +108,11 @@ export default function EigenerklarungenScreen() {
   const [busyTyp, setBusyTyp] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const { data: profil } = await supabase.from('anbieter_profile').select('id').maybeSingle()
-    const pid = (profil?.id as string | undefined) ?? null
+    // Über die Mitgliedschaft (nicht maybeSingle auf anbieter_profile) —
+    // gleiche Regel wie Bewerben/Profil, falls jemand mehreren Betrieben angehört.
+    const { data: sess } = await supabase.auth.getSession()
+    const userId = sess.session?.user.id
+    const pid = userId ? await meinAnbieterId(userId) : null
     setProfilId(pid)
     if (!pid) return
     const { data } = await supabase
@@ -176,7 +181,7 @@ export default function EigenerklarungenScreen() {
         .from('eigenerklarungen')
         .upload(pfad, bytes, { upsert: true, contentType: contentTypeFuer(sicherName) })
       if (upErr) {
-        Alert.alert('Upload fehlgeschlagen', upErr.message)
+        Alert.alert('Upload fehlgeschlagen', 'Die Datei konnte nicht hochgeladen werden. Bitte erneut versuchen.')
         return
       }
 
@@ -186,8 +191,10 @@ export default function EigenerklarungenScreen() {
         body: JSON.stringify({ bucket: 'eigenerklarungen', pfad }),
       })
       if (!verRes.ok) {
-        const j = (await verRes.json().catch(() => ({}))) as { error?: string }
-        Alert.alert('Datei abgelehnt', j.error ?? 'Die Datei hat die Prüfung nicht bestanden.')
+        // Abgelehnte Datei sofort entfernen — sonst bleibt sie im Bucket und
+        // kann bei upsert eine zuvor gültige Datei am selben Pfad überschreiben.
+        await supabase.storage.from('eigenerklarungen').remove([pfad]).catch(() => undefined)
+        Alert.alert('Datei abgelehnt', 'Die Datei hat die Prüfung nicht bestanden.')
         return
       }
 

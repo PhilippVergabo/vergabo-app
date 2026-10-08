@@ -1,56 +1,51 @@
-# Welcome to your Expo app 👋
+# Vergabo App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Anbieter-App zu [Vergabo](https://www.vergabo.de) — Ausschreibungen finden, Angebote abgeben, Nachweise verwalten.
 
-## Get started
+**Stack:** Expo SDK 54 (CNG/managed, kein committed `ios/`/`android/`), Expo Router, Supabase, Web-API auf www.vergabo.de.
 
-1. Install dependencies
+**Auslieferung:** Nur iOS / TestFlight (Pilotphase). Kein App-Store-/Play-Store-Upload.
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Setup
 
 ```bash
-npm run reset-project
+npm install
+cp .env.example .env   # EXPO_PUBLIC_SUPABASE_*, EXPO_PUBLIC_API_URL
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Typen prüfen: `npx tsc --noEmit` · Lint: `npm run lint`
 
-### Other setup steps
+## Verteilung
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Details und Fallstricke: **`CLAUDE.md`**. Kurzfassung:
 
-## Learn more
+| Änderung | Weg |
+|---|---|
+| Nur JS/TS/Styles/Assets | `eas update --branch production --message "…"` |
+| Native Dep, Plugin, SDK | `git pull` → `eas build --platform ios --profile production` → prüfen → `eas submit` |
 
-To learn more about developing your project with Expo, look at the following resources:
+`runtimeVersion` nutzt Fingerprint-Policy. Nach nativem Build den OTA-Kanal neu bespielen. `eas.json`-Änderungen (z. B. `ascAppId`) verschieben den Fingerprint — nicht mitten in einem OTA-Zyklus.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Architektur (kurz)
 
-## Join the community
+- **Supabase:** Auth, RLS-scoped Reads (Aufträge, Bewerbungen, Eigenerklärungen, …)
+- **Web-API** (`authedFetch`): Login/Captcha, Angebots-Submit, Admin, Datei-Verifikation, bid-sichere Auftragsdaten
+- **Nie direkt lesen:** `budget_von`, `budget_bis`, `haushaltsstelle`, `kostenschaetzung` — über `src/lib/auftragOeffentlich.ts`
 
-Join our community of developers creating universal apps.
+## Doppelt gehaltene Regeln (vs. Web-Repo)
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Beim Anfassen im Web (`../vergabo`) hier gegenprüfen:
+
+| App | Web |
+|---|---|
+| `src/lib/labels.ts` | `lib/verfahren.ts`, `lib/gewerke.ts` |
+| `src/lib/bewerbung.ts` (`EINHEITEN`) | `lib/einheiten.ts` |
+| `src/lib/eigenerklarungTypen.ts` | `lib/eigenerklarungTypen.ts` |
+| `src/lib/nachweisGueltigkeit.ts` | `lib/nachweisGueltigkeit.ts` |
+
+## EAS
+
+- Projekt-ID: `36bb5ba6-6445-4ae5-ac40-0c9785b538c9`
+- Owner: `vergabo`
+- Bundle-ID: `de.vergabo.app`

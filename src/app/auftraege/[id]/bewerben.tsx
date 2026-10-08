@@ -19,6 +19,7 @@ import { NachweisSektion } from '@/components/angebot/NachweisSektion'
 import { VerpflichtungenSektion } from '@/components/angebot/VerpflichtungenSektion'
 import { sektionStyles } from '@/components/angebot/sektionStyles'
 import {
+  findePassendeEigenerklaerung,
   fmtPreis,
   toFormFile,
   type Kriterium,
@@ -37,6 +38,8 @@ export default function BewerbenScreen() {
   const router = useRouter()
 
   const [loading, setLoading] = useState(true)
+  const [ladenFehler, setLadenFehler] = useState(false)
+  const [ladenVersuch, setLadenVersuch] = useState(0)
   const [nichtMoeglich, setNichtMoeglich] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -70,6 +73,8 @@ export default function BewerbenScreen() {
     let aktiv = true
 
     async function laden() {
+      setLadenFehler(false)
+      setNichtMoeglich(false)
       // Über die Web-Plattform statt direkt aus `auftraege`: Die Bieteransicht
       // liefert die Positionsvorlage OHNE Preise und nie die Kalkulation der
       // Vergabestelle (src/lib/auftragOeffentlich.ts).
@@ -81,6 +86,9 @@ export default function BewerbenScreen() {
         return
       }
       if (ergebnis.art === 'fehler') {
+        // Netz-/Serverfehler ≠ „Frist abgelaufen": eigenes UI mit Retry, sonst
+        // sähe der Nutzer ein leeres Formular und könnte trotzdem einreichen.
+        setLadenFehler(true)
         setLoading(false)
         return
       }
@@ -150,13 +158,7 @@ export default function BewerbenScreen() {
           const autoBest: Record<string, boolean> = {}
           const nachweisMap: Record<string, string | null> = {}
           for (const k of kriterien) {
-            const passend = eks?.find(
-              (e) =>
-                e.typ === k.id ||
-                (k.nachweis_typ && e.typ === k.nachweis_typ) ||
-                e.typ === k.text?.toLowerCase().replace(/\s+/g, '_') ||
-                k.text?.toLowerCase().includes(e.typ.toLowerCase()),
-            )
+            const passend = findePassendeEigenerklaerung(eks, k)
             if (k.nachweis_erforderlich) nachweisMap[k.id] = passend?.id ?? null
             else if (passend) autoBest[k.id] = true
           }
@@ -174,7 +176,7 @@ export default function BewerbenScreen() {
     return () => {
       aktiv = false
     }
-  }, [id])
+  }, [id, ladenVersuch])
 
   const pflichtKriterienErfuellt = eignungskriterien
     .filter((k) => k.pflicht)
@@ -273,6 +275,31 @@ export default function BewerbenScreen() {
     )
   }
 
+  if (ladenFehler) {
+    return (
+      <View style={[styles.center, { padding: 24, gap: 16 }]}>
+        <Text style={styles.successTitle}>Laden fehlgeschlagen</Text>
+        <Text style={styles.successText}>
+          Die Ausschreibung konnte nicht geladen werden. Bitte prüfen Sie Ihre Verbindung und
+          versuchen Sie es erneut.
+        </Text>
+        <Pressable
+          style={styles.submitBtn}
+          onPress={() => {
+            setLoading(true)
+            setLadenVersuch((n) => n + 1)
+          }}
+          accessibilityRole="button"
+        >
+          <Text style={styles.submitText}>Erneut versuchen</Text>
+        </Pressable>
+        <Pressable onPress={() => router.dismissTo(`/auftraege/${id}`)} accessibilityRole="button">
+          <Text style={styles.gateHint}>Zurück zur Ausschreibung</Text>
+        </Pressable>
+      </View>
+    )
+  }
+
   if (nichtMoeglich) {
     return (
       <View style={[styles.center, { padding: 24, gap: 16 }]}>
@@ -301,11 +328,13 @@ export default function BewerbenScreen() {
             von dort gekommen). replace legte einen ZWEITEN Eintrag derselben
             Route an — der native Zurück-Button sprang dann auf einen optisch
             identischen Screen und wirkte tot. dismissTo springt zum vorhandenen
-            Eintrag zurück und ersetzt nur dann, wenn es ihn nicht gibt. */}
-        <Pressable style={styles.submitBtn} onPress={() => router.dismissTo('/')}>
-          <Text style={styles.submitText}>Zurück zur Übersicht</Text>
+            Eintrag zurück und ersetzt nur dann, wenn es ihn nicht gibt.
+            Ziel ist das Auftragsdetail (wie nach Bearbeiten), damit der Status
+            „bereits beworben" sofort sichtbar ist — nicht die Startliste. */}
+        <Pressable style={styles.submitBtn} onPress={() => router.dismissTo(`/auftraege/${id}`)}>
+          <Text style={styles.submitText}>Zurück zur Ausschreibung</Text>
         </Pressable>
-        <AutoZurueck onAblauf={() => router.dismissTo('/')} />
+        <AutoZurueck onAblauf={() => router.dismissTo(`/auftraege/${id}`)} />
       </View>
     )
   }
