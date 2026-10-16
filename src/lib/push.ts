@@ -2,6 +2,7 @@ import { Platform } from 'react-native'
 import * as Device from 'expo-device'
 import * as Notifications from 'expo-notifications'
 import Constants from 'expo-constants'
+import { appZiel } from '@/lib/benachrichtigungZiel'
 import { supabase } from '@/lib/supabase'
 import { meinAnbieterId, meinAuftraggeberId } from '@/lib/mitgliedschaft'
 
@@ -122,22 +123,22 @@ export async function registriereAdminPush(): Promise<void> {
   }
 }
 
-// Whitelist für Push-Deeplinks: Auftragsdetails und Nachweisliste
-// (/auftraege/<uuid>, /eigenerklarungen; optional mit Web-Anker — der Anker
-// wird verworfen). Alles andere wird ignoriert, damit manipulierte
-// Notification-Daten keine beliebige Navigation auslösen können.
-const ERLAUBTER_PUSH_LINK = /^(\/auftraege\/[0-9a-f-]{36}|\/eigenerklarungen)(?:#[\w-]*)?$/
-
 /**
  * Registriert einen Listener für das Antippen einer Push-Nachricht.
- * Ruft onTap mit dem `link` aus den Notification-Daten auf, aber nur wenn er
- * der Whitelist entspricht. Gibt eine Cleanup-Funktion zurück.
+ * Ruft onTap mit der ZIEL-ROUTE auf, die appZiel aus dem Link bildet — nie mit
+ * dem Link selbst. Unbekanntes löst keine Navigation aus (siehe
+ * lib/benachrichtigungZiel.ts). Gibt eine Cleanup-Funktion zurück.
+ *
+ * Vorher stand hier eine eigene Whitelist, die nur den exakten App-Pfad
+ * `/eigenerklarungen` akzeptierte. Die Web-Links lauten aber
+ * `/dashboard/anbieter/eigenerklarungen` — der Nachweis-Hinweis war auf diesem
+ * Weg also genauso tot wie in der Liste.
  */
 export function addPushTapListener(onTap: (link: string) => void): () => void {
   const sub = Notifications.addNotificationResponseReceivedListener((response) => {
     const link = response.notification.request.content.data?.link
-    const treffer = typeof link === 'string' ? link.match(ERLAUBTER_PUSH_LINK) : null
-    if (treffer) onTap(treffer[1])
+    const ziel = typeof link === 'string' ? appZiel(link) : null
+    if (ziel) onTap(ziel)
   })
   return () => sub.remove()
 }

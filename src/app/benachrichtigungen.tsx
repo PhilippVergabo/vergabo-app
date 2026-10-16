@@ -10,6 +10,7 @@ import {
 } from 'react-native'
 import { Stack, useFocusEffect, useRouter, type Href } from 'expo-router'
 import { supabase } from '@/lib/supabase'
+import { appZiel, zielHinweis } from '@/lib/benachrichtigungZiel'
 import { C } from '@/lib/theme'
 
 // Spiegel des Web-NotificationBell (vergabo/components/NotificationBell.tsx):
@@ -33,23 +34,6 @@ type Benachrichtigung = {
 // wird die Auftrags-UUID extrahiert → /auftraege/<uuid>. Nachweis-/Ablauf-
 // Hinweise landen auf /eigenerklarungen. Links ohne erlaubten Bezug
 // (z. B. /dashboard) werden ignoriert (nur als gelesen markiert).
-const AUFTRAG_LINK = /\/auftraege\/([0-9a-f-]{36})/
-const NACHWEIS_LINK = /eigenerklaerungen|nachweis/i
-
-function appZiel(link: string | null): string | null {
-  if (!link) return null
-  let dekodiert = link
-  try {
-    dekodiert = decodeURIComponent(link)
-  } catch {
-    // ungültige Kodierung → Rohwert prüfen
-  }
-  const treffer = dekodiert.match(AUFTRAG_LINK)
-  if (treffer) return `/auftraege/${treffer[1]}`
-  if (NACHWEIS_LINK.test(dekodiert)) return '/eigenerklarungen'
-  return null
-}
-
 /** Relativer Zeitstempel („vor 5 Min.") bzw. Datum für ältere Einträge. */
 function zeitLabel(iso: string): string {
   const dann = new Date(iso).getTime()
@@ -162,7 +146,7 @@ export default function BenachrichtigungenScreen() {
         }
         ItemSeparatorComponent={() => <View style={styles.trenner} />}
         renderItem={({ item }) => {
-          const navigierbar = appZiel(item.link) !== null
+          const ziel = appZiel(item.link)
           return (
             <Pressable
               style={({ pressed }) => [
@@ -173,9 +157,7 @@ export default function BenachrichtigungenScreen() {
               onPress={() => void antippen(item)}
               accessibilityRole="button"
               accessibilityLabel={`${item.gelesen ? '' : 'Ungelesen: '}${item.titel}. ${item.nachricht}`}
-              accessibilityHint={
-                navigierbar ? 'Öffnet die Ausschreibung' : 'Markiert die Benachrichtigung als gelesen'
-              }
+              accessibilityHint={zielHinweis(ziel)}
             >
               <View style={styles.eintragInhalt}>
                 <Text style={[styles.titel, !item.gelesen && styles.titelUngelesen]}>
