@@ -4,6 +4,7 @@ import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import { Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { zurueckKnopfOptionen } from '@/components/ZurueckKnopf'
 
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
@@ -52,12 +53,14 @@ export default function RootLayout() {
     <>
       {/* Dunkle Status-Bar-Icons (Uhrzeit/Akku/Signal) — sichtbar auf hellem Hintergrund */}
       <StatusBar style="dark" />
-      <Stack>
+      {/* Eigener Zurück-Knopf auf allen Seiten mit Kopfzeile — der native war
+          unter iOS 26 wiederholt eine leere Kapsel ohne Funktion (ZurueckKnopf.tsx). */}
+      <Stack screenOptions={zurueckKnopfOptionen()}>
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen
         name="passwort-vergessen"
-        options={{ title: 'Passwort vergessen', headerBackTitle: 'Zurück', headerTintColor: '#3a5a3e' }}
+        options={{ title: 'Passwort vergessen', headerBackTitle: 'Zurück', headerTintColor: '#3a5a3e', ...zurueckKnopfOptionen('/login') }}
       />
       <Stack.Screen name="registrieren-auswahl" options={{ headerShown: false }} />
       <Stack.Screen name="registrieren" options={{ headerShown: false }} />
