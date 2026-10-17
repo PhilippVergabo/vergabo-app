@@ -16,6 +16,7 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 // sauberem Hinweis, falls der Build die Module noch nicht enthält.
 import { supabase } from '@/lib/supabase'
 import { authedFetch } from '@/lib/authedFetch'
+import { istGemerkt, setzeGemerkt } from '@/lib/merkliste'
 import { ladeBudgetstufen } from '@/lib/auftragOeffentlich'
 import { dateiWaehlen, type PickedFile } from '@/lib/bewerbung'
 import { sanitizeDateiname } from '@/lib/eigenerklarungTypen'
@@ -76,6 +77,10 @@ export default function AuftragDetailScreen() {
   const [nachgereicht, setNachgereicht] = useState<Record<string, boolean>>({})
   const [zieheZurueck, setZieheZurueck] = useState(false)
   const [pdfBusy, setPdfBusy] = useState(false)
+  // Merkliste: null = gilt für dieses Konto nicht (z. B. Vergabestelle) oder
+  // es liegt schon ein Angebot vor — dann kein Knopf.
+  const [gemerkt, setGemerkt] = useState<boolean | null>(null)
+  const [merkBusy, setMerkBusy] = useState(false)
   // Zeitpunkt-Snapshot beim Mount: hält das Render rein (react-hooks/purity),
   // statt Date.now() während des Renderns aufzurufen. Für die tagesgenaue
   // Frist-Anzeige ausreichend; aktualisiert bei jedem Daten-Reload ohnehin.
@@ -116,6 +121,7 @@ export default function AuftragDetailScreen() {
     setBudgetText(stufen[id] ?? null)
     const meine = (b ?? [])[0] as { id: string; status: string } | undefined
     setMeineBewerbung(meine ?? null)
+    setGemerkt(meine ? null : await istGemerkt(id))
     setErhalteneBewertung((bw as { sterne: number; kommentar: string | null } | null) ?? null)
 
     // Offene Nachforderungen zur eigenen Bewerbung (Bearer-API der Web-Plattform).
@@ -336,6 +342,25 @@ export default function AuftragDetailScreen() {
   // abgelaufen ist (konsistent zum Bearbeiten-Flow).
   const fristAbgelaufen = auftrag.frist ? new Date() >= new Date(auftrag.frist) : false
   const aktiv = auftrag.status === 'veroeffentlicht' && !fristAbgelaufen
+
+  const merkenUmschalten = async () => {
+    if (gemerkt === null || merkBusy) return
+    setMerkBusy(true)
+    const ergebnis = await setzeGemerkt(auftrag.id, !gemerkt)
+    setMerkBusy(false)
+    if (!ergebnis.ok) {
+      Alert.alert('Merkliste', ergebnis.fehler)
+      return
+    }
+    setGemerkt(ergebnis.gemerkt)
+    if (ergebnis.gemerkt) {
+      Alert.alert(
+        'Gemerkt',
+        'Wir erinnern Sie 48 Stunden vor Fristende, falls Sie bis dahin kein Angebot abgegeben haben.',
+      )
+    }
+  }
+
   // Offene Nachforderungen mit noch laufender Frist (Spiegel Web-Banner).
   const offeneNachforderungen = nachforderungen.filter(
     (nf) => nf.status === 'offen' && new Date(nf.frist) >= new Date(),
@@ -551,13 +576,28 @@ export default function AuftragDetailScreen() {
             ) : null}
           </View>
         ) : aktiv ? (
-          <Pressable
-            style={styles.ctaButton}
-            onPress={() => router.push(`/auftraege/${auftrag.id}/bewerben`)}
-            accessibilityRole="button"
-          >
-            <Text style={styles.ctaButtonText}>Angebot abgeben</Text>
-          </Pressable>
+          <>
+            <Pressable
+              style={styles.ctaButton}
+              onPress={() => router.push(`/auftraege/${auftrag.id}/bewerben`)}
+              accessibilityRole="button"
+            >
+              <Text style={styles.ctaButtonText}>Angebot abgeben</Text>
+            </Pressable>
+            {gemerkt !== null ? (
+              <Pressable
+                style={[styles.merkButton, merkBusy && { opacity: 0.6 }]}
+                onPress={merkenUmschalten}
+                disabled={merkBusy}
+                accessibilityRole="button"
+                accessibilityState={{ selected: gemerkt }}
+              >
+                <Text style={styles.merkButtonText}>
+                  {gemerkt ? '★ Gemerkt' : '☆ Merken – später kalkulieren'}
+                </Text>
+              </Pressable>
+            ) : null}
+          </>
         ) : (
           <View style={styles.beworbenBanner}>
             <Text style={styles.beworbenText}>Diese Ausschreibung nimmt keine Angebote mehr an.</Text>
@@ -667,6 +707,19 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#ffffff',
+  },
+  merkButton: {
+    marginTop: 10,
+    borderRadius: 10,
+    padding: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#3a5a3e',
+  },
+  merkButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#3a5a3e',
   },
   beworbenBanner: {
     backgroundColor: '#3a5a3e18',

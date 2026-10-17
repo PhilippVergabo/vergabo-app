@@ -19,6 +19,8 @@ import { addPushTapListener, registriereFuerPush } from '@/lib/push'
 import { gewerkLabel } from '@/lib/labels'
 import { haversineKm, plzKoordinaten } from '@/lib/geo'
 import { C } from '@/lib/theme'
+import { ladeMerkliste, type GemerkterAuftrag } from '@/lib/merkliste'
+import { datumDe } from '@/lib/nachweisGueltigkeit'
 
 function Chip({ label, aktiv, onPress }: { label: string; aktiv: boolean; onPress: () => void }) {
   return (
@@ -46,6 +48,8 @@ export function AnbieterHome() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Gemerkte, noch offene Ausschreibungen (Web-Route /api/merkliste).
+  const [gemerkt, setGemerkt] = useState<GemerkterAuftrag[]>([])
   const [suche, setSuche] = useState('')
   const [gewerkFilter, setGewerkFilter] = useState<string | null>(null)
   // Standard: nur passende Aufträge (eigene Gewerke + Aktionsradius) — wie das
@@ -145,6 +149,13 @@ export function AnbieterHome() {
       return
     }
     setError(null)
+    // Merkliste nicht-fatal nachladen: Ohne sie funktioniert die Liste genauso.
+    const merkliste = await ladeMerkliste()
+    const jetztMs = Date.now()
+    setGemerkt(merkliste.filter(e =>
+      e.auftraege?.status === 'veroeffentlicht'
+      && !!e.auftraege.angebotsfrist
+      && new Date(e.auftraege.angebotsfrist).getTime() > jetztMs))
     const angebote = new Map<string, number | null>()
     for (const b of bewerbungenData ?? []) {
       angebote.set(b.auftrag_id, b.angebotspreis_netto ?? null)
@@ -373,15 +384,33 @@ export function AnbieterHome() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />
         }
         ListHeaderComponent={
-          auftraege.length > 0 ? (
-            <Text style={styles.count}>
-              {gefilterteAuftraege.length}{' '}
-              {gefilterteAuftraege.length === 1 ? 'Ausschreibung' : 'Ausschreibungen'}
-              {modus === 'passend' && profil
-                ? ` · passend zu Ihren Gewerken im Umkreis von ${profil.radius} km`
-                : ''}
-            </Text>
-          ) : null
+          <View>
+            {gemerkt.length > 0 ? (
+              <View style={styles.gemerktBox}>
+                <Text style={styles.gemerktTitel}>★ Gemerkt</Text>
+                {gemerkt.map(e => (
+                  <Pressable
+                    key={e.auftrag_id}
+                    onPress={() => router.push(`/auftraege/${e.auftrag_id}`)}
+                    accessibilityRole="link"
+                    style={styles.gemerktZeile}
+                  >
+                    <Text style={styles.gemerktName} numberOfLines={1}>{e.auftraege?.titel}</Text>
+                    <Text style={styles.gemerktFrist}>Frist {datumDe(e.auftraege?.angebotsfrist) ?? '—'}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+            {auftraege.length > 0 ? (
+              <Text style={styles.count}>
+                {gefilterteAuftraege.length}{' '}
+                {gefilterteAuftraege.length === 1 ? 'Ausschreibung' : 'Ausschreibungen'}
+                {modus === 'passend' && profil
+                  ? ` · passend zu Ihren Gewerken im Umkreis von ${profil.radius} km`
+                  : ''}
+              </Text>
+            ) : null}
+          </View>
         }
         ListEmptyComponent={
           <View style={styles.empty}>
@@ -402,6 +431,19 @@ export function AnbieterHome() {
 }
 
 const styles = StyleSheet.create({
+  gemerktBox: {
+    backgroundColor: C.card,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+    padding: 12,
+    marginBottom: 12,
+    gap: 6,
+  },
+  gemerktTitel: { fontSize: 13, fontWeight: '700', color: C.primary },
+  gemerktZeile: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 6 },
+  gemerktName: { flex: 1, fontSize: 14, color: C.text },
+  gemerktFrist: { fontSize: 13, color: C.muted },
   container: { flex: 1, backgroundColor: C.bg },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: C.bg },
   header: {
