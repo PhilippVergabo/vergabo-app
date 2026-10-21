@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from 'react-native'
-import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 // HINWEIS: expo-file-system/expo-sharing sind NATIVE Module, die erst nach dem
 // letzten Dev-Build hinzukamen. Top-Level-Imports würden die Route (und damit
 // die ganze App) in älteren Builds beim Laden crashen ("Cannot find native
@@ -368,25 +368,6 @@ export default function AuftragDetailScreen() {
 
   return (
     <>
-      {/* Zurück-Fallback: Wird das Detail ohne Vorgänger-Screen geöffnet
-          (z. B. Deeplink/Push bei Kaltstart), gäbe es keinen funktionierenden
-          nativen Zurück-Button — dann eigener Button zur Übersicht. */}
-      {!router.canGoBack() && (
-        <Stack.Screen
-          options={{
-            headerLeft: () => (
-              <Pressable
-                onPress={() => router.replace('/')}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="Zur Übersicht"
-              >
-                <Text style={{ color: '#3a5a3e', fontSize: 16, fontWeight: '600' }}>‹ Übersicht</Text>
-              </Pressable>
-            ),
-          }}
-        />
-      )}
     {/* automaticallyAdjustKeyboardInsets: iOS schiebt das Rückfragen-Eingabefeld
         über die Tastatur — auch mit der schwebenden Kopfzeile korrekt (eine
         KeyboardAvoidingView mit 'padding' kompensierte dort zu wenig). */}

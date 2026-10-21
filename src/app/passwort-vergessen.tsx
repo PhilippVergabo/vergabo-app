@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
+import { useLocalSearchParams } from 'expo-router'
 import { API_URL } from '@/lib/config'
 import { captchaFehlerText, fordereCaptchaToken } from '@/components/Turnstile'
 import { C } from '@/lib/theme'
@@ -19,7 +19,6 @@ import { C } from '@/lib/theme'
 // ist bewusst neutral formuliert — kein E-Mail-Enumeration-Leak.
 
 export default function PasswortVergessenScreen() {
-  const router = useRouter()
   // Vom Login-Screen mitgegebene Adresse als Startwert: Wer sich gerade
   // vertippt hat, soll sie hier nicht erneut eintippen müssen. Nur als
   // Anfangswert — Änderungen im Feld bleiben davon unberührt.
@@ -86,25 +85,6 @@ export default function PasswortVergessenScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* Eigener Zurück-Button statt des nativen: Nach Abmelden entsteht der
-          Login über mehrere router.replace-Schritte — der native Button wird
-          dann zwar angezeigt, reagiert aber nicht (bekanntes Stack-Problem,
-          vgl. Kommentar in _layout.tsx und Fallback im Auftragsdetail).
-          Dieser Button funktioniert in beiden Fällen. */}
-      <Stack.Screen
-        options={{
-          headerLeft: () => (
-            <Pressable
-              onPress={() => (router.canGoBack() ? router.back() : router.replace('/login'))}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Zurück zum Login"
-            >
-              <Text style={styles.zurueck}>‹ Zurück</Text>
-            </Pressable>
-          ),
-        }}
-      />
       <View style={styles.card}>
         <Text style={styles.title}>Passwort zurücksetzen</Text>
         <Text style={styles.beschreibung}>
