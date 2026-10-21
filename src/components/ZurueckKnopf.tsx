@@ -1,4 +1,5 @@
-import { Pressable, Text } from 'react-native'
+import { useEffect } from 'react'
+import { BackHandler, Platform, Pressable, Text } from 'react-native'
 import { useRouter, type Href } from 'expo-router'
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack'
 
@@ -17,11 +18,26 @@ import type { NativeStackNavigationOptions } from '@react-navigation/native-stac
  * Glas-Kapsel (ab iOS 26). Die Wischgeste vom linken Rand bleibt davon
  * unberührt.
  *
- * Gibt es keinen Vorgänger — z. B. nach einem Push-Tipp beim Kaltstart —,
+ * Gibt es keinen Vorgänger — z. B. nach einem Deeplink beim Kaltstart —,
  * führt er zu `ersatzZiel` statt ins Leere.
+ *
+ * Auf Android erscheint er NUR in diesem Fall (siehe `zurueckKnopfOptionen`)
+ * und übernimmt dann auch die Zurück-Taste bzw. -Geste des Systems: Ohne
+ * Vorgänger würde sie die App schließen, statt zur Übersicht zu führen.
  */
 export function ZurueckKnopf({ ersatzZiel = '/' }: { ersatzZiel?: Href }) {
   const router = useRouter()
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (router.canGoBack()) return false // normaler Weg zurück
+      router.replace(ersatzZiel)
+      return true
+    })
+    return () => sub.remove()
+  }, [router, ersatzZiel])
+
   return (
     <Pressable
       onPress={() => (router.canGoBack() ? router.back() : router.replace(ersatzZiel))}
@@ -36,10 +52,25 @@ export function ZurueckKnopf({ ersatzZiel = '/' }: { ersatzZiel?: Href }) {
 }
 
 /**
- * Kopfzeilen-Optionen mit eigenem Zurück-Knopf (nur iOS, `unstable_headerLeftItems`
- * gilt nur dort). Auf Android bleibt der native Knopf.
+ * Kopfzeilen-Optionen mit eigenem Zurück-Knopf.
+ *
+ * iOS: ersetzt den nativen Knopf immer (`unstable_headerLeftItems` gilt nur dort).
+ *
+ * Android: Der native Knopf funktioniert und bleibt — aber er erscheint nur,
+ * wenn es einen Vorgänger gibt. Bis 21.10.2026 hatte die Auftragsseite für den
+ * Fall ohne Vorgänger einen eigenen „‹ Übersicht“-Knopf; er fiel mit dem
+ * Aufräumen der alten Knöpfe weg (App-PR #17), und auf Android stand die Seite
+ * dann ohne Rückweg da. Deshalb hier: Gibt es einen Vorgänger, liefert
+ * `headerLeft` nichts und der native Knopf bleibt sichtbar
+ * (`@react-navigation/native-stack`: `hideBackButton` nur bei
+ * `headerBackVisible === false`); gibt es keinen, steht unser Knopf dort.
  */
 export function zurueckKnopfOptionen(ersatzZiel: Href = '/'): NativeStackNavigationOptions {
+  if (Platform.OS === 'android') {
+    return {
+      headerLeft: ({ canGoBack }) => (canGoBack ? null : <ZurueckKnopf ersatzZiel={ersatzZiel} />),
+    }
+  }
   return {
     unstable_headerLeftItems: () => [
       {
