@@ -110,6 +110,7 @@ darunter eine rechtlich relevante Verfahrensbezeichnung.
 | `src/lib/nachweisGueltigkeit.ts` | `lib/nachweisGueltigkeit.ts` | Warnfenster (30 Tage), Statusnamen, Hinweistexte |
 | `src/lib/labels.ts` → `GEWERK_LABELS` | `lib/gewerke.ts` | Schlüssel und Labels |
 | `src/lib/bewerbung.ts` → `findePassendeEigenerklaerung` | `lib/eignungNachweis.ts` → `findeProfilNachweis` | Ist ein `nachweis_typ` verlangt, zählt **ausschließlich** dieser — sonst meldet das Formular „Aus Profil", und `/api/bewerbung/einreichen` antwortet 422 „Falscher Nachweis-Typ" |
+| `src/lib/angebotsEntwurf.ts` | `lib/angebotsEntwurf.ts` | Entwurfs-Version, 30-Tage-Grenze, was als „leer" gilt. **Gewollt anders:** Die App sichert die ausgewählten **Dateien** mit (Kopie unter `Paths.document`), der Browser kann das nicht und merkt sich nur die Namen |
 
 **Beim Anfassen einer dieser Dateien im Web immer hier gegenprüfen.** Ein
 schneller Abgleich:
