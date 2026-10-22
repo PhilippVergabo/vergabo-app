@@ -24,14 +24,15 @@ export function AdressAutocomplete({ value, onChange, onSelect, placeholder }: P
 
   const abortRef = useRef<AbortController | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Verhindert, dass die Auswahl (die `value` ändert) sofort wieder eine Suche auslöst.
-  const geradeGewaehlt = useRef(false)
+  // Gesucht wird nur nach einer EINGABE — nicht, wenn ein gespeicherter Wert
+  // geladen wird, und nicht nach der Auswahl eines Vorschlags (die `value`
+  // ebenfalls ändert). Vorher sprang die Vorschlagsliste schon beim Öffnen
+  // des Profils auf, obwohl die Adresse längst eingetragen war (Meldung des
+  // Betreibers, 22.10.2026).
+  const getippt = useRef(false)
 
   useEffect(() => {
-    if (geradeGewaehlt.current) {
-      geradeGewaehlt.current = false
-      return
-    }
+    if (!getippt.current) return
     if (debounceRef.current) clearTimeout(debounceRef.current)
 
     debounceRef.current = setTimeout(async () => {
@@ -67,7 +68,7 @@ export function AdressAutocomplete({ value, onChange, onSelect, placeholder }: P
   }, [value])
 
   function waehle(v: AdressVorschlag) {
-    geradeGewaehlt.current = true
+    getippt.current = false
     onSelect(v)
     setOffen(false)
     setVorschlaege([])
@@ -79,7 +80,7 @@ export function AdressAutocomplete({ value, onChange, onSelect, placeholder }: P
         <TextInput
           style={styles.input}
           value={value}
-          onChangeText={onChange}
+          onChangeText={(t) => { getippt.current = true; onChange(t) }}
           placeholder={placeholder}
           placeholderTextColor={C.muted}
           autoCorrect={false}
