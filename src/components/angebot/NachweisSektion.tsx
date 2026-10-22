@@ -1,6 +1,8 @@
 import type { Dispatch, SetStateAction } from 'react'
-import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native'
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
+import { useRouter } from 'expo-router'
 import { NACHWEIS_TYP_LABELS, dateiWaehlen, type Kriterium, type PickedFile } from '@/lib/bewerbung'
+import { C } from '@/lib/theme'
 import { sektionStyles as styles } from './sektionStyles'
 
 type Props = {
@@ -14,6 +16,12 @@ type Props = {
   nachweisVorhanden?: Record<string, { quelle: 'profil' | 'upload' | null }>
   /** Nur Bearbeiten-Screen: zusätzlicher Style der Upload-Buttons (marginTop: 6). */
   uploadBtnStyle?: StyleProp<ViewStyle>
+  /**
+   * Werden die Eingaben dieses Formulars als Entwurf gesichert? Nur dann darf
+   * der Hinweis unten versprechen, dass ein Abstecher zu den Nachweisen die
+   * Eingaben nicht kostet (Angebotsabgabe: ja; Bearbeiten: nein).
+   */
+  eingabenGesichert?: boolean
 }
 
 // Sektion „Eignungsnachweis": Profil-Treffer, Datei-Upload je Kriterium und
@@ -28,8 +36,17 @@ export function NachweisSektion({
   setNachweisDateien,
   nachweisVorhanden,
   uploadBtnStyle,
+  eingabenGesichert = false,
 }: Props) {
+  const router = useRouter()
+
   if (kriterien.length === 0) return null
+
+  // Pflichtkriterien, die nur anzuhaken sind (kein Dokument verlangt) und noch
+  // offen sind. Ist keins offen, erübrigt sich der Hinweis.
+  const offeneAnhakKriterien = kriterien.filter(
+    (k) => k.pflicht && !k.nachweis_erforderlich && !eignungsbestaetigung[k.id],
+  )
 
   async function nachweisWaehlen(kriteriumId: string) {
     const f = await dateiWaehlen()
@@ -135,7 +152,52 @@ export function NachweisSektion({
           )
         })}
         <Text style={styles.hint}>* Pflichtnachweis</Text>
+        {/* Bis 22.10.2026 stand hier nur „* Pflichtnachweis" — ein Tester las
+            „Nachweis" als „Dokument", lud im Profil Dateien hoch, kam zurück
+            und fand die Kästchen weiter leer (die Freigabe durch Vergabo stand
+            noch aus). Dass ein Haken genügt, stand nirgends. Wortlaut wie im
+            Web (app/auftraege/[id]/bewerben/page.tsx). */}
+        {offeneAnhakKriterien.length > 0 ? (
+          <View style={eigeneStyles.anhakBox}>
+            <Text style={eigeneStyles.anhakTitel}>⚠️ Pflichtangaben noch nicht bestätigt</Text>
+            <Text style={eigeneStyles.anhakText}>
+              Bestätigen Sie die mit * markierten Angaben durch Anhaken – ein Dokument ist dafür
+              nicht nötig. Nachweise, die Sie unter „Eigenerklärungen & Nachweise“ hinterlegt
+              haben, werden automatisch angehakt, sobald Vergabo sie geprüft hat.
+              {eingabenGesichert ? ' Ihre Eingaben hier bleiben dabei erhalten.' : ''}
+            </Text>
+            <Pressable
+              onPress={() => router.push('/eigenerklarungen')}
+              hitSlop={8}
+              accessibilityRole="link"
+            >
+              <Text style={eigeneStyles.anhakLink}>Eigenerklärungen & Nachweise öffnen</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </View>
     </View>
   )
 }
+
+// Nur für den Hinweis zu den anzuhakenden Pflichtangaben — der Rest der
+// Sektion nutzt die geteilten sektionStyles.
+const eigeneStyles = StyleSheet.create({
+  anhakBox: {
+    backgroundColor: C.warn,
+    borderWidth: 1,
+    borderColor: '#c879414d',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 4,
+  },
+  anhakTitel: { fontSize: 12, fontWeight: '600', color: '#8a4a1e' },
+  anhakText: { fontSize: 12, color: '#8a4a1e', lineHeight: 18 },
+  anhakLink: {
+    fontSize: 12,
+    color: '#8a4a1e',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+})

@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -28,6 +29,20 @@ import {
   type PickedFile,
   type Position,
 } from '@/lib/bewerbung'
+import {
+  ENTWURF_VERSION,
+  dateiVorhanden,
+  entwurfSchluessel,
+  entwurfSumme,
+  entwurfZeitText,
+  istEntwurfLeer,
+  leseEntwurf,
+  loescheEntwurf,
+  raeumeAlteEntwuerfe,
+  schreibeEntwurf,
+  sichereDatei,
+  type AngebotsEntwurf,
+} from '@/lib/angebotsEntwurf'
 import { authedFetch } from '@/lib/authedFetch'
 import { ladeBieteransicht } from '@/lib/auftragOeffentlich'
 import { AutoZurueck } from '@/components/AutoZurueck'
@@ -53,7 +68,15 @@ export default function BewerbenScreen() {
   const [lvPositionen, setLvPositionen] = useState<LvPosition[]>([])
   const [lvPreise, setLvPreise] = useState<LvPreis[]>([])
   const [positionen, setPositionen] = useState<Position[]>([])
-  const [agPositionen, setAgPositionen] = useState<Position[]>([])
+  // Startwerte der Kalkulations-Editoren: Vorlage des Auftraggebers ODER die
+  // Positionen/Preise aus dem Entwurf. Beide Editoren übernehmen ihre
+  // Startwerte NUR beim Mounten — deshalb werden sie gesetzt, während noch
+  // `loading` gilt, und „Entwurf verwerfen" erhöht `formGeneration`.
+  const [startPositionen, setStartPositionen] = useState<Position[]>([])
+  const [startLvPreise, setStartLvPreise] = useState<LvPreis[]>([])
+  /** IDs der vom Auftraggeber vorgegebenen Positionen — nur die sind gesperrt. */
+  const [agIds, setAgIds] = useState<string[]>([])
+  const [formGeneration, setFormGeneration] = useState(0)
   const [gesamtpreis, setGesamtpreis] = useState(0)
 
   const [eignungskriterien, setEignungskriterien] = useState<Kriterium[]>([])
@@ -67,6 +90,16 @@ export default function BewerbenScreen() {
 
   const [anhaenge, setAnhaenge] = useState<PickedFile[]>([])
   const [bindefrist, setBindefrist] = useState<string | null>(null)
+
+  // ── Entwurf (src/lib/angebotsEntwurf.ts) ──────────────────────────────────
+  // Der vom Auftraggeber vorbelegte Ausführungszeitraum zählt NICHT als eigene
+  // Eingabe — sonst meldete das Formular schon beim ersten Öffnen einen Entwurf.
+  const [vorbelegterZeitraum, setVorbelegterZeitraum] = useState<string | null>(null)
+  const [entwurfKey, setEntwurfKey] = useState<string | null>(null)
+  const [wiederhergestellt, setWiederhergestellt] = useState<{
+    am: string
+    fehlendeDateien: string[]
+  } | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -116,6 +149,7 @@ export default function BewerbenScreen() {
         ? new Date(data.ausfuehrung_bis as string).toLocaleDateString('de-DE')
         : null
       const zeitraum = von && bis ? `${von} – ${bis}` : (von ?? bis ?? null)
+      setVorbelegterZeitraum(zeitraum)
       if (zeitraum) setAusfuehrungszeitraum((prev) => prev || zeitraum)
 
       const kriterien = (data.eignungskriterien ?? []) as Kriterium[]
@@ -128,12 +162,16 @@ export default function BewerbenScreen() {
       // Bearbeiten-Screen sperrt genau diese IDs.
       const vorlage = data.positionenVorlage
 
-      if (data.hat_leistungsverzeichnis && lvPos.length > 0) {
+      const mitLv = Boolean(data.hat_leistungsverzeichnis) && lvPos.length > 0
+      if (mitLv) {
         setHatLv(true)
         setLvPositionen(lvPos)
       } else if (vorlage.length > 0) {
         // Positionen des Auftraggebers als Startliste — OHNE dessen Preise.
-        setAgPositionen(vorlage.map((p) => ({ ...p, einzelpreis: 0, gesamt: 0 })))
+        setStartPositionen(vorlage.map((p) => ({ ...p, einzelpreis: 0, gesamt: 0 })))
+        // Nur diese IDs sperren: aus einem Entwurf können eigene Positionen
+        // dazukommen, die editierbar bleiben müssen.
+        setAgIds(vorlage.map((p) => p.id))
       }
 
       // Anbieter-Profil + verifizierte Eigenerklärungen für Profil-Abgleich
@@ -165,6 +203,55 @@ export default function BewerbenScreen() {
           if (!aktiv) return
           setNachweisProfilMatch(nachweisMap)
           setEignungsbestaetigung(autoBest)
+
+          // Entwurf wiederherstellen. Muss hier passieren — VOR dem ersten
+          // Rendern des Formulars: Die Kalkulations-Editoren übernehmen ihre
+          // Startwerte nur beim Mounten.
+          const key = entwurfSchluessel(id, anbieterId)
+          setEntwurfKey(key)
+          const entwurf = await leseEntwurf(key)
+          if (!aktiv) return
+          if (entwurf) {
+            if (entwurf.angebotsnummer) setAngebotsnummer(entwurf.angebotsnummer)
+            if (entwurf.formData.ausfuehrungszeitraum) {
+              setAusfuehrungszeitraum(entwurf.formData.ausfuehrungszeitraum)
+            }
+            setBeschreibung(entwurf.formData.beschreibung)
+            setReferenzen(entwurf.formData.referenzen)
+            if (!mitLv && entwurf.positionen.length > 0) {
+              setStartPositionen(entwurf.positionen)
+              setPositionen(entwurf.positionen)
+            }
+            if (mitLv && entwurf.lvPreise.length > 0) {
+              setStartLvPreise(entwurf.lvPreise)
+              setLvPreise(entwurf.lvPreise)
+            }
+            // Summe aus dem Entwurf: Die Editoren melden sie erst bei der
+            // nächsten Eingabe — ohne das stünde „0,00 €" über einer
+            // ausgefüllten Kalkulation und „Einreichen" bliebe gesperrt.
+            setGesamtpreis(entwurfSumme(entwurf))
+            // Häkchen aus dem Entwurf ergänzen die automatischen aus dem Profil.
+            setEignungsbestaetigung({ ...autoBest, ...entwurf.eignungsbestaetigung })
+            if (entwurf.verpflichtungenBestaetigt.length === verpfl.length) {
+              setVerpflichtungenBestaetigt(entwurf.verpflichtungenBestaetigt)
+            }
+            // Dateien: nur übernehmen, was noch auf dem Gerät liegt. Der Rest
+            // wird im Hinweis namentlich genannt, damit klar ist, was fehlt.
+            const fehlende: string[] = []
+            const nachweise: Record<string, PickedFile> = {}
+            for (const [kriteriumId, datei] of Object.entries(entwurf.nachweisDateien)) {
+              if (dateiVorhanden(datei)) nachweise[kriteriumId] = datei
+              else fehlende.push(datei.name)
+            }
+            const anhaengeVorhanden = entwurf.anhaenge.filter((d) => {
+              if (dateiVorhanden(d)) return true
+              fehlende.push(d.name)
+              return false
+            })
+            setNachweisDateien(nachweise)
+            setAnhaenge(anhaengeVorhanden)
+            setWiederhergestellt({ am: entwurf.gespeichertAm, fehlendeDateien: fehlende })
+          }
         }
       }
 
@@ -178,6 +265,124 @@ export default function BewerbenScreen() {
     }
   }, [id, ladenVersuch])
 
+  // Einmal beim Öffnen alte Entwürfe samt Dateien entsorgen (älter als 30 Tage
+  // oder unbrauchbar). Ein Entwurf, der nie wieder geöffnet wird, würde sonst
+  // für immer liegen bleiben.
+  useEffect(() => {
+    void raeumeAlteEntwuerfe()
+  }, [])
+
+  // ── Entwurf automatisch speichern ─────────────────────────────────────────
+  // Jede Eingabe wandert automatisch in den Entwurf — kein Knopf, kein
+  // „Speichern". Kurz entprellt, damit nicht jeder Tastendruck schreibt. Ist
+  // nichts Eigenes eingegeben (nur Vorbelegungen), wird ein alter Entwurf
+  // gelöscht statt einer leeren Hülle, die beim nächsten Mal
+  // „wiederhergestellt" meldet.
+  const entwurfRef = useRef<AngebotsEntwurf | null>(null)
+  const speichereEntwurf = useCallback(
+    async (e: AngebotsEntwurf, key: string) => {
+      if (istEntwurfLeer(e, vorbelegterZeitraum)) {
+        await loescheEntwurf(key)
+        return
+      }
+      // Dateien erst hier in den Entwurfsordner kopieren: Der Dokument-Picker
+      // legt sie nur in den Cache, den iOS bei Platzmangel abräumen darf.
+      // `sichereDatei` ist mehrfach aufrufbar und kopiert nur beim ersten Mal.
+      const gesicherteNachweise: Record<string, PickedFile> = {}
+      for (const [kriteriumId, datei] of Object.entries(e.nachweisDateien)) {
+        gesicherteNachweise[kriteriumId] = sichereDatei(key, datei)
+      }
+      await schreibeEntwurf(key, {
+        ...e,
+        nachweisDateien: gesicherteNachweise,
+        anhaenge: e.anhaenge.map((d) => sichereDatei(key, d)),
+      })
+    },
+    [vorbelegterZeitraum],
+  )
+
+  useEffect(() => {
+    if (!entwurfKey || loading || success) return
+    const e: AngebotsEntwurf = {
+      version: ENTWURF_VERSION,
+      gespeichertAm: new Date().toISOString(),
+      angebotsnummer,
+      formData: { ausfuehrungszeitraum, beschreibung, referenzen },
+      positionen: hatLv ? [] : positionen,
+      lvPreise: hatLv ? lvPreise : [],
+      eignungsbestaetigung,
+      verpflichtungenBestaetigt,
+      nachweisDateien,
+      anhaenge,
+    }
+    entwurfRef.current = e
+    const t = setTimeout(() => {
+      void speichereEntwurf(e, entwurfKey)
+    }, 400)
+    return () => clearTimeout(t)
+  }, [
+    entwurfKey,
+    loading,
+    success,
+    angebotsnummer,
+    ausfuehrungszeitraum,
+    beschreibung,
+    referenzen,
+    hatLv,
+    positionen,
+    lvPreise,
+    eignungsbestaetigung,
+    verpflichtungenBestaetigt,
+    nachweisDateien,
+    anhaenge,
+    speichereEntwurf,
+  ])
+
+  // Beim Verlassen der App sofort schreiben: iOS entlädt eine App im
+  // Hintergrund ohne Vorwarnung — die 400 ms Entprellung wären dann verloren.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (status) => {
+      if (status === 'active') return
+      const e = entwurfRef.current
+      if (!entwurfKey || loading || success || !e) return
+      void speichereEntwurf(e, entwurfKey)
+    })
+    return () => sub.remove()
+  }, [entwurfKey, loading, success, speichereEntwurf])
+
+  // „Entwurf verwerfen": Entwurf samt Dateien weg, dann das Formular neu
+  // aufbauen (Vorbelegungen, Angebotsnummer, Profil-Häkchen) — wie beim ersten
+  // Öffnen. `formGeneration` mountet die Kalkulations-Editoren neu; sie halten
+  // ihre Werte intern und blieben sonst stehen.
+  async function entwurfVerwerfen() {
+    const key = entwurfKey
+    setWiederhergestellt(null)
+    // `loading` sperrt auch den Speicher-Effekt: Sein Aufräumen stoppt einen
+    // schon laufenden Entprell-Timer, der den Entwurf sonst wieder anlegen
+    // könnte, nachdem er gelöscht wurde.
+    setLoading(true)
+    setAngebotsnummer('')
+    setAusfuehrungszeitraum('')
+    setBeschreibung('')
+    setReferenzen('')
+    setPositionen([])
+    setStartPositionen([])
+    setAgIds([])
+    setLvPreise([])
+    setStartLvPreise([])
+    setGesamtpreis(0)
+    setNachweisDateien({})
+    setAnhaenge([])
+    setEignungsbestaetigung({})
+    setVerpflichtungenBestaetigt(verpflichtungen.map(() => false))
+    entwurfRef.current = null
+    // Erst löschen, dann neu laden — sonst fände das Neuladen womöglich den
+    // Entwurf wieder, den dieser Aufruf gerade entsorgt.
+    if (key) await loescheEntwurf(key)
+    setFormGeneration((g) => g + 1)
+    setLadenVersuch((n) => n + 1)
+  }
+
   const pflichtKriterienErfuellt = eignungskriterien
     .filter((k) => k.pflicht)
     .every((k) => {
@@ -186,6 +391,14 @@ export default function BewerbenScreen() {
     })
 
   const verpflichtungenAlleBestaetigt = verpflichtungen.every((_, i) => verpflichtungenBestaetigt[i])
+
+  // Reihenfolge wie im Formular, damit der Hinweis von oben nach unten liest.
+  const offenePflichtangaben = [
+    gesamtpreis <= 0 ? 'Angebotspreis (Kalkulation ausfüllen)' : null,
+    !pflichtKriterienErfuellt ? 'Eignungsnachweise' : null,
+    !verpflichtungenAlleBestaetigt ? 'Verpflichtungserklärungen' : null,
+    ausfuehrungszeitraum.trim().length === 0 ? 'Ausführungszeitraum' : null,
+  ].filter((o): o is string => o !== null)
 
   const canSubmit =
     gesamtpreis > 0 &&
@@ -259,6 +472,8 @@ export default function BewerbenScreen() {
         return
       }
 
+      // Eingereicht — Entwurf samt gesicherten Dateien entfernen.
+      if (entwurfKey) await loescheEntwurf(entwurfKey)
       setSuccess(true)
       setSubmitting(false)
     } catch {
@@ -349,6 +564,24 @@ export default function BewerbenScreen() {
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
       >
+        {wiederhergestellt ? (
+          <View style={styles.entwurf}>
+            <Text style={styles.entwurfText}>
+              📝 Ihr Entwurf vom {entwurfZeitText(wiederhergestellt.am)} wurde wiederhergestellt.
+              {wiederhergestellt.fehlendeDateien.length > 0
+                ? ` Diese Dateien liegen nicht mehr auf dem Gerät – bitte erneut auswählen: ${wiederhergestellt.fehlendeDateien.join(', ')}.`
+                : ''}
+            </Text>
+            <Pressable
+              onPress={() => void entwurfVerwerfen()}
+              hitSlop={8}
+              accessibilityRole="button"
+            >
+              <Text style={styles.entwurfVerwerfen}>Entwurf verwerfen</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         {bindefrist ? (
           <View style={styles.bindefrist}>
             <Text style={styles.bindefristText}>
@@ -374,10 +607,13 @@ export default function BewerbenScreen() {
         </View>
 
         <KalkulationSektion
+          key={formGeneration}
           hatLv={hatLv}
           lvPositionen={lvPositionen}
-          initialPositionen={agPositionen}
-          positionenVorgegeben={agPositionen.length > 0}
+          initialLvPreise={startLvPreise}
+          initialPositionen={startPositionen}
+          positionenVorgegeben={agIds.length > 0}
+          vorgegebeneIds={agIds}
           onLvChange={(preise, summe) => {
             setLvPreise(preise)
             setGesamtpreis(summe)
@@ -395,6 +631,7 @@ export default function BewerbenScreen() {
           nachweisProfilMatch={nachweisProfilMatch}
           nachweisDateien={nachweisDateien}
           setNachweisDateien={setNachweisDateien}
+          eingabenGesichert
         />
 
         <VerpflichtungenSektion
@@ -431,11 +668,17 @@ export default function BewerbenScreen() {
         >
           <Text style={styles.submitText}>{submitting ? 'Wird eingereicht …' : 'Angebot einreichen'}</Text>
         </Pressable>
-        {!canSubmit && !submitting ? (
-          <Text style={styles.gateHint}>
-            Bitte Kalkulation, Ausführungszeitraum sowie alle Pflichtnachweise und
-            Verpflichtungserklärungen ausfüllen.
-          </Text>
+        {/* Benennt vor dem Absenden, was noch fehlt — statt eines
+            kommentarlos gesperrten Knopfes (wie im Web). */}
+        {!canSubmit && !submitting && offenePflichtangaben.length > 0 ? (
+          <View style={styles.offenBox}>
+            <Text style={styles.offenTitel}>Noch offen, um das Angebot abzuschicken:</Text>
+            {offenePflichtangaben.map((o) => (
+              <Text key={o} style={styles.offenPunkt}>
+                •  {o}
+              </Text>
+            ))}
+          </View>
         ) : null}
       </ScrollView>
     </View>
@@ -467,6 +710,27 @@ const styles = StyleSheet.create({
   submitBtnDisabled: { opacity: 0.5 },
   submitText: { fontSize: 16, fontWeight: '700', color: '#ffffff' },
   gateHint: { fontSize: 12, color: C.muted, textAlign: 'center' },
+  entwurf: {
+    backgroundColor: C.ok,
+    borderWidth: 1,
+    borderColor: '#3a5a3e33',
+    borderRadius: 8,
+    padding: 12,
+    gap: 6,
+  },
+  entwurfText: { fontSize: 13, color: '#2f4a33', lineHeight: 19 },
+  entwurfVerwerfen: { fontSize: 12, color: C.muted, textDecorationLine: 'underline' },
+  offenBox: {
+    backgroundColor: C.warn,
+    borderWidth: 1,
+    borderColor: '#c879414d',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 2,
+  },
+  offenTitel: { fontSize: 12, fontWeight: '600', color: '#8a4a1e' },
+  offenPunkt: { fontSize: 12, color: '#8a4a1e', lineHeight: 18 },
   successTitle: { fontSize: 22, fontWeight: '700', color: C.text, textAlign: 'center' },
   successText: { fontSize: 15, color: C.muted, textAlign: 'center', lineHeight: 22 },
 })
