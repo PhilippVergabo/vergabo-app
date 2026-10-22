@@ -109,6 +109,7 @@ darunter eine rechtlich relevante Verfahrensbezeichnung.
 | `src/lib/eigenerklarungTypen.ts` | `lib/eigenerklarungTypen.ts` | Neue Typen, `pflicht`/`kannAblaufen`/`belegbar` |
 | `src/lib/nachweisGueltigkeit.ts` | `lib/nachweisGueltigkeit.ts` | Warnfenster (30 Tage), Statusnamen, Hinweistexte |
 | `src/lib/labels.ts` → `GEWERK_LABELS` | `lib/gewerke.ts` | Schlüssel und Labels |
+| `src/lib/bewerbung.ts` → `findePassendeEigenerklaerung` | `lib/eignungNachweis.ts` → `findeProfilNachweis` | Ist ein `nachweis_typ` verlangt, zählt **ausschließlich** dieser — sonst meldet das Formular „Aus Profil", und `/api/bewerbung/einreichen` antwortet 422 „Falscher Nachweis-Typ" |
 
 **Beim Anfassen einer dieser Dateien im Web immer hier gegenprüfen.** Ein
 schneller Abgleich:

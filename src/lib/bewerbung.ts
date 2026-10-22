@@ -88,22 +88,49 @@ export const NACHWEIS_TYP_LABELS: Record<string, string> = {
 }
 
 /**
- * Eigenerklärung zum Eignungskriterium zuordnen — nur exakte Typ-/ID-Treffer.
+ * Eigenerklärung aus dem Profil, die dieses Eignungskriterium erfüllt.
  *
- * Früher gab es zusätzlich `k.text.includes(e.typ)`: kurze Typs (z. B. Teil-
- * strings) konnten dann falsche Nachweise als „Aus Profil" markieren. Die
- * sicheren Regeln sind: Kriterium-ID, expliziter `nachweis_typ`, oder der
- * aus dem Text abgeleitete Snake-Case-Schlüssel.
+ * ⚠️ Diese Funktion MUSS dieselbe Antwort geben wie die Prüfung in
+ * `/api/bewerbung/einreichen`. Bis hierher tat sie das nicht, und der
+ * Unterschied war für den Betrieb eine Sackgasse:
+ *
+ *   Kriterium „Gewerbeanmeldung", verlangter Typ `meisterbrief`.
+ *   Die alten Regeln waren ODER-verknüpft — `e.typ === k.id` traf die
+ *   Gewerbeanmeldung aus dem Profil, OBWOHL ein Meisterbrief verlangt war.
+ *   Das Formular meldete „Aus Profil" und zeigte KEIN Upload-Feld. Beim
+ *   Einreichen verglich der Server `nachweis_typ` mit dem Typ der
+ *   Eigenerklärung und antwortete 422 „Falscher Nachweis-Typ".
+ *   Der Betrieb sah einen grünen Haken und kam nicht weiter — ohne Ausweg.
+ *
+ * Deshalb: **Ist ein Typ verlangt, zählt ausschließlich dieser.** Die
+ * Heuristik über ID und Wortlaut greift nur, wenn KEIN Typ verlangt wurde —
+ * dort akzeptiert der Server ohnehin jede verifizierte Eigenerklärung.
+ *
+ * Gegenstück im Web: `findeProfilNachweis()` in `lib/eignungNachweis.ts`
+ * (dort seit 14.09.2026). Reihenfolge und Fallunterscheidung sind bewusst
+ * identisch — nur die Parameter stehen hier umgekehrt.
+ *
+ * Hinweis für später: Der Teilstring-Vergleich im letzten Zweig war in der App
+ * einmal entfernt worden (kurze Typs könnten falsch treffen). Er ist zurück,
+ * weil beide Seiten dieselbe Antwort geben müssen; er greift nur ohne
+ * verlangten Typ, wo eine abweichende Wahl den Server nicht scheitern lässt.
  */
 export function findePassendeEigenerklaerung<T extends { id: string; typ: string }>(
   eks: T[] | null | undefined,
   k: Kriterium,
 ): T | undefined {
-  return eks?.find(
-    (e) =>
-      e.typ === k.id ||
-      (k.nachweis_typ != null && k.nachweis_typ !== '' && e.typ === k.nachweis_typ) ||
-      e.typ === k.text?.toLowerCase().replace(/\s+/g, '_'),
+  const liste = eks ?? []
+
+  if (k.nachweis_typ) {
+    return liste.find((e) => e.typ === k.nachweis_typ)
+  }
+
+  const text = k.text?.toLowerCase() ?? ''
+  const alsSchluessel = text.replace(/\s+/g, '_')
+  return (
+    liste.find((e) => e.typ === k.id) ??
+    liste.find((e) => e.typ === alsSchluessel) ??
+    liste.find((e) => e.typ.length > 0 && text.includes(e.typ.toLowerCase()))
   )
 }
 
