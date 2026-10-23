@@ -33,7 +33,7 @@ export default function RegistrierenAuswahl() {
         <Text style={styles.optionIcon}>🏛️</Text>
         <Text style={styles.optionTitel}>Ich bin Auftraggeber</Text>
         <Text style={styles.optionText}>
-          Kommune, Behörde oder Schule, die Aufträge rechtssicher nach UVgO vergeben möchte.
+          Kommune, Behörde oder Schule, die Aufträge vergaberechtlich geführt und automatisch dokumentiert vergeben möchte.
           In der Pilotphase kostenlos.
         </Text>
       </Pressable>
