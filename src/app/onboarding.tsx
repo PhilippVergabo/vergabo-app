@@ -27,7 +27,8 @@ const SLIDES: Slide[] = [
     icon: '',
     logo: true,
     titel: 'Vergabo',
-    text: 'Öffentliche Bauaufträge bis 25.000 € — einfach finden, rechtssicher gewinnen. Für Handwerksbetriebe dauerhaft kostenlos.',
+    // Kein „rechtssicher“ (anwaltliche Beratung 23.10.2026, CLAUDE.md im Web-Repo).
+    text: 'Öffentliche Bauaufträge bis 25.000 € — einfach finden, digital anbieten. Für Handwerksbetriebe dauerhaft kostenlos.',
   },
   {
     icon: '🔍',
