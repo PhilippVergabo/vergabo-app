@@ -356,11 +356,14 @@ export function AnbieterHome() {
           style={styles.verifBanner}
           onPress={() => router.push('/eigenerklarungen')}
           accessibilityRole="button"
-          accessibilityLabel="Konto noch nicht verifiziert – Nachweise hochladen"
+          accessibilityLabel="Nachweise hochladen für das Abzeichen „Nachweise geprüft“"
         >
+          {/* Seit 24.10.2026 ein Bonus, keine Voraussetzung für den Zuschlag
+              (Beratung Frau Mehlitz, Web-Repo CLAUDE.md). */}
           <Text style={styles.verifBannerText}>
-            ⏳ Ihr Konto ist noch nicht verifiziert – Zuschläge sind erst nach der Verifizierung
-            möglich. <Text style={styles.verifBannerLink}>Nachweise hochladen →</Text>
+            ✓ Laden Sie Ihre Nachweise hoch – nach unserer Prüfung sehen Vergabestellen bei Ihren
+            Angeboten das Abzeichen „Nachweise geprüft“.{' '}
+            <Text style={styles.verifBannerLink}>Nachweise hochladen →</Text>
           </Text>
         </Pressable>
       ) : null}
