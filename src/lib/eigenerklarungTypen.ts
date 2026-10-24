@@ -5,6 +5,12 @@ import { dateiEndung } from '@/lib/bewerbung'
 export interface ErklaerungTyp {
   id: string
   label: string
+  /**
+   * Von Vergabestellen HÄUFIG VERLANGT — im Profil deshalb nur als Dokument
+   * hinterlegbar. Seit 24.10.2026 keine Plattform-Pflicht mehr (Beratung Frau
+   * Mehlitz): Was ein Bieter vorlegen muss, legt die Vergabestelle fest. Der
+   * Name bleibt, weil Web und App ihn gemeinsam führen.
+   */
   pflicht: boolean
   /**
    * Kann dieser Nachweis ablaufen?
