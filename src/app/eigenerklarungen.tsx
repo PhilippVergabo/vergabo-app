@@ -101,11 +101,35 @@ function StatusBadge({ e }: { e: Erklaerung | undefined }) {
   return <Text style={[styles.badge, styles.badgeWartet]}>⏳ in Prüfung</Text>
 }
 
+/** Fälliger Nachweis aus GET /api/eigenerklarung/aktualitaet. */
+type AktualitaetFaellig = { id: string; bezeichnung: string }
+
+/**
+ * „Sind diese Nachweise noch aktuell?" — nach 2 Jahren (seit 24.10.2026).
+ *
+ * Die Regel steht nur im Web (`lib/nachweisAktualitaet.ts`); die App fragt die
+ * Route, statt sie nachzubauen — eine doppelt gehaltene Regel weniger. Hierher
+ * führt der Push `nachweis_aktualitaet` des Crons. Kennt das Backend die Route
+ * (noch) nicht oder fehlt das Netz, entfällt die Karte einfach.
+ */
+async function ladeAktualitaet(): Promise<AktualitaetFaellig[]> {
+  try {
+    const res = await authedFetch('/api/eigenerklarung/aktualitaet')
+    if (!res.ok) return []
+    const j = (await res.json()) as { faellig?: AktualitaetFaellig[] }
+    return Array.isArray(j.faellig) ? j.faellig : []
+  } catch {
+    return []
+  }
+}
+
 export default function EigenerklarungenScreen() {
   const [profilId, setProfilId] = useState<string | null>(null)
   const [erklaerungen, setErklaerungen] = useState<Erklaerung[]>([])
   const [laden, setLaden] = useState(true)
   const [busyTyp, setBusyTyp] = useState<string | null>(null)
+  const [aktualitaet, setAktualitaet] = useState<AktualitaetFaellig[]>([])
+  const [aktualitaetBusy, setAktualitaetBusy] = useState(false)
 
   const load = useCallback(async () => {
     // Über die Mitgliedschaft (nicht maybeSingle auf anbieter_profile) —
@@ -120,7 +144,29 @@ export default function EigenerklarungenScreen() {
       .select('id, typ, dateiname, bestaetigt, admin_verifiziert, admin_abgelehnt, gueltig_bis')
       .eq('anbieter_id', pid)
     setErklaerungen((data as Erklaerung[]) ?? [])
+    setAktualitaet(await ladeAktualitaet())
   }, [])
+
+  async function aktualitaetBestaetigen() {
+    if (aktualitaetBusy || aktualitaet.length === 0) return
+    setAktualitaetBusy(true)
+    try {
+      const res = await authedFetch('/api/eigenerklarung/aktualitaet', {
+        method: 'POST',
+        body: JSON.stringify({ ids: aktualitaet.map((a) => a.id) }),
+      })
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string }
+        Alert.alert('Bestätigung fehlgeschlagen', j.error ?? 'Bitte versuchen Sie es erneut.')
+        return
+      }
+      await load()
+    } catch {
+      Alert.alert('Keine Verbindung', 'Die Bestätigung konnte nicht gesendet werden. Bitte prüfen Sie Ihre Verbindung.')
+    } finally {
+      setAktualitaetBusy(false)
+    }
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -291,6 +337,38 @@ export default function EigenerklarungenScreen() {
         {Math.round(EIGENERKLARUNG_UPLOAD.maxBytes / (1024 * 1024))} MB pro Datei.
       </Text>
 
+      {aktualitaet.length > 0 ? (
+        <View style={styles.aktualitaetKarte}>
+          <Text style={styles.aktualitaetTitel}>
+            {aktualitaet.length === 1 ? 'Ist dieser Nachweis noch aktuell?' : 'Sind diese Nachweise noch aktuell?'}
+          </Text>
+          <Text style={styles.aktualitaetText}>
+            Seit über 2 Jahren hinterlegt. Stimmt alles noch, genügt Ihre Bestätigung – ein neues
+            Dokument ist dafür nicht nötig. Hat sich etwas geändert, laden Sie unten eine neue Fassung hoch.
+          </Text>
+          {aktualitaet.map((a) => (
+            <Text key={a.id} style={styles.aktualitaetText}>
+              •  {a.bezeichnung}
+            </Text>
+          ))}
+          <Pressable
+            style={[styles.btn, styles.btnPrimary, styles.aktualitaetKnopf, aktualitaetBusy && styles.btnAus]}
+            onPress={() => void aktualitaetBestaetigen()}
+            disabled={aktualitaetBusy}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: aktualitaetBusy, busy: aktualitaetBusy }}
+          >
+            {aktualitaetBusy ? (
+              <ActivityIndicator size="small" color="#ffffff" />
+            ) : (
+              <Text style={styles.btnPrimaryText}>
+                {aktualitaet.length === 1 ? 'Ja, noch aktuell' : 'Ja, alle noch aktuell'}
+              </Text>
+            )}
+          </Pressable>
+        </View>
+      ) : null}
+
       {ERKLAERUNG_TYPEN.map((typ) => {
         const e = getErklaerung(typ.id)
         const busy = busyTyp === typ.id
@@ -384,6 +462,17 @@ const styles = StyleSheet.create({
   mutedText: { color: C.muted, fontSize: 16 },
   intro: { fontSize: 13, color: C.muted, lineHeight: 19 },
   erklaerungstext: { fontSize: 12, color: C.muted, lineHeight: 18, marginTop: 2 },
+  aktualitaetKarte: {
+    backgroundColor: C.warn,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#c879414d',
+    padding: 14,
+    gap: 6,
+  },
+  aktualitaetTitel: { fontSize: 15, fontWeight: '700', color: '#8a4a1e' },
+  aktualitaetText: { fontSize: 13, color: '#8a4a1e', lineHeight: 19 },
+  aktualitaetKnopf: { alignSelf: 'flex-start', marginTop: 6 },
   karte: {
     backgroundColor: C.card,
     borderRadius: 12,

@@ -146,6 +146,11 @@ Stelle, an der stand, **welcher** Nachweis gemeint war. Die Nachweisliste zeigt
 die Gültigkeit jetzt an (nur Anzeige, gesetzt wird sie im Browser). **Beim
 Anlegen eines neuen Benachrichtigungstyps im Web mitdenken, ob die App zeigen
 kann, worum es geht** — sie empfängt jede In-App-Benachrichtigung als Push.
+Gegenbeispiel, richtig gemacht: `nachweis_aktualitaet` („Sind Ihre Nachweise
+noch aktuell?“, nach 2 Jahren, seit 24.10.2026) führt auf die Nachweisseite,
+und dort steht die passende Karte samt Bestätigen-Knopf. Die App rechnet die
+Fälligkeit **nicht** selbst, sie fragt `/api/eigenerklarung/aktualitaet` (GET
+fällig, POST bestätigen) — die Regel liegt nur im Web.
 
 ⚠️ **„Eigenerklärung ohne Datei" ist überall derselbe Sonderfall — an drei Stellen.** Ein angehakter Nachweis ohne hochgeladenes Dokument kann von niemandem geprüft werden; die Erklärung selbst ist der Nachweis. Deshalb: `components/admin/NachweisBadge.tsx` (`istOffenerNachweis` — kein Badge „in Prüfung", keine Freigabe-Knöpfe, nicht mitgezählt), `src/app/eigenerklarungen.tsx` (Anbieter-Sicht: „✓ bestätigt" statt „⏳ in Prüfung" — sonst wartet der Betrieb auf einen Zustand, der nie eintritt; seit 24.09.2026), und im Web `/api/app-admin/anbieter` (`.not('dateiname','is',null)` bei der Zählung) plus `/api/app-admin/eigenerklarungen` (Feld `pruefung_noetig`). **Wer eine dieser Stellen anfasst, prüft die anderen mit.**
 
