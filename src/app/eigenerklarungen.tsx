@@ -27,8 +27,10 @@ import { C } from '@/lib/theme'
 // Nachweise/Eigenerklärungen im Konto hinterlegen. Flow je Datei:
 // Client-Vorprüfung → Storage-Upload ({anbieter_profile.id}/{typ}/{name}) →
 // serverseitige Magic-Byte-Verifikation (/api/datei-verifizieren, Bearer) →
-// DB-Eintrag erst NACH bestandener Verifikation. Pflichttypen brauchen eine
-// Datei; die übrigen lassen sich auch ohne Datei als Eigenerklärung bestätigen.
+// DB-Eintrag erst NACH bestandener Verifikation. Häufig verlangte Typen
+// (`pflicht`) brauchen eine Datei; die übrigen lassen sich auch ohne Datei als
+// Eigenerklärung bestätigen. Seit 24.10.2026 keine Plattform-Pflicht mehr —
+// was ein Bieter vorlegen muss, legt die Vergabestelle je Auftrag fest.
 
 type Erklaerung = {
   id: string
@@ -278,12 +280,15 @@ export default function EigenerklarungenScreen() {
     }
   }
 
-  // Eigenerklärung ohne Datei – nur für Nicht-Pflicht-Typen (Spiegel Web)
+  // Eigenerklärung ohne Datei – nicht für die häufig verlangten Typen (Spiegel Web)
   async function bestaetigen(typ: string) {
     if (!profilId || busyTyp) return
     const typDef = ERKLAERUNG_TYPEN.find((t) => t.id === typ)
     if (typDef?.pflicht) {
-      Alert.alert('Datei erforderlich', 'Für diesen Pflichtnachweis ist ein Datei-Upload erforderlich.')
+      Alert.alert(
+        'Bitte als Datei hinterlegen',
+        'Diesen Nachweis verlangen Vergabestellen meist als Dokument – bitte laden Sie die Datei hoch.',
+      )
       return
     }
     setBusyTyp(typ)
@@ -377,7 +382,7 @@ export default function EigenerklarungenScreen() {
             <View style={styles.kartenKopf}>
               <View style={{ flex: 1, gap: 2 }}>
                 <Text style={styles.typLabel}>{typ.label}</Text>
-                {typ.pflicht ? <Text style={styles.pflicht}>Pflichtnachweis</Text> : null}
+                {typ.pflicht ? <Text style={styles.pflicht}>Häufig verlangt</Text> : null}
                 {e?.dateiname ? <Text style={styles.dateiname}>📎 {e.dateiname}</Text> : null}
                 {/* Gueltigkeit — nur Anzeige. Der Cron pusht „Nachweis laeuft
                     bald ab"; ohne diese Zeile stand der Betrieb danach vor
