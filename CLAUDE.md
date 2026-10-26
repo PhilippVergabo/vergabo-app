@@ -164,6 +164,12 @@ gesendet wird über `/api/rueckfrage`, das auch alle Interessenten benachrichtig
 Die App ordnet nur an — die Benachrichtigungslogik von früher (Bieter direkt aus
 `bewerbungen` anschreiben) ist entfallen. Ältere Builds schreiben noch direkt in
 die Tabelle; der Trigger macht daraus Frage bzw. Mitteilung.
+⚠️ **`rückfragen.autor_id` nie wieder abfragen** (seit 26.10.2026): Über
+`anbieter_oeffentlich.user_id` verriet sie den fragenden Betrieb. „Ihre Frage“
+kommt aus der Funktion `meine_bieterfragen` (RPC). Sobald keine App-Stände vor
+dem OTA vom 26.10. mehr laufen, wird das Leserecht entzogen
+(`../vergabo/docs/migration-bieterfragen-ohne-autor.sql`, Schritt B) — eine
+Abfrage mit `autor_id` liefert dann gar nichts mehr.
 
 ⚠️ **„Eigenerklärung ohne Datei" ist überall derselbe Sonderfall — an drei Stellen.** Ein angehakter Nachweis ohne hochgeladenes Dokument kann von niemandem geprüft werden; die Erklärung selbst ist der Nachweis. Deshalb: `components/admin/NachweisBadge.tsx` (`istOffenerNachweis` — kein Badge „in Prüfung", keine Freigabe-Knöpfe, nicht mitgezählt), `src/app/eigenerklarungen.tsx` (Anbieter-Sicht: „✓ bestätigt" statt „⏳ in Prüfung" — sonst wartet der Betrieb auf einen Zustand, der nie eintritt; seit 24.09.2026), und im Web `/api/app-admin/anbieter` (`.not('dateiname','is',null)` bei der Zählung) plus `/api/app-admin/eigenerklarungen` (Feld `pruefung_noetig`). **Wer eine dieser Stellen anfasst, prüft die anderen mit.**
 
