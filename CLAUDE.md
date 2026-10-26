@@ -83,6 +83,9 @@ gemergt werden — nicht mittendrin. Nachrechnen mit
 - `npm run lint` (= `expo lint`) **funktioniert** — ESLint ist eingerichtet
   (`eslint` + `eslint-config-expo` in den devDependencies, Flat-Config in
   `eslint.config.js`). Nach frischem Checkout `npm install` nicht vergessen.
+  `eslint-config-expo` steht auf `~10.0.0` (SDK-54-Stand, seit 26.10.2026 —
+  vorher `^57`, das passte nicht zum SDK). Regeln aus neueren Versionen gibt es
+  damit nicht: Ein `eslint-disable` für eine unbekannte Regel ist ein Lint-Fehler.
   Historischer Fallstrick: Fehlt ESLint, schreibt `expo lint` beim Fehlschlag
   ungefragt `eslint` + `eslint-config-expo` in die `package.json`, ohne sie zu
   installieren — so entstandene Zeilen nie committen. Neue Lint-Dev-Deps immer

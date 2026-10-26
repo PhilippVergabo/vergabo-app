@@ -152,7 +152,6 @@ export function Rueckfragen({
   useEffect(() => {
     // setLaden läuft im .finally() nach Auflösung des Promise – also asynchron,
     // nicht synchron im Effect-Body. Standard-Ladepattern, keine Kaskadenrenders.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     load().finally(() => setLaden(false))
   }, [load])
 

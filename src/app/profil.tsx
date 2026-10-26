@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -17,6 +18,7 @@ import { meinAnbieterId, KEIN_PROFIL } from '@/lib/mitgliedschaft'
 import { AdressAutocomplete } from '@/components/AdressAutocomplete'
 import { bundeslandKuerzel } from '@/lib/adressSuche'
 import { GEWERK_LABELS } from '@/lib/labels'
+import { logoUrl, waehleUndLadeLogo } from '@/lib/firmenlogo'
 import { C } from '@/lib/theme'
 
 // Anbieter-Profil bearbeiten — Pendant zu app/dashboard/anbieter/profil im Web.
@@ -110,6 +112,12 @@ export default function ProfilScreen() {
   const [bankname, setBankname] = useState('')
   const [iban, setIban] = useState('')
   const [bic, setBic] = useState('')
+  // Firmenlogo für Angebots-PDFs — wird sofort nach der Auswahl hochgeladen,
+  // unabhängig vom Speichern-Knopf (wie im Web).
+  const [anbieterId, setAnbieterId] = useState<string | null>(null)
+  const [logoDatei, setLogoDatei] = useState<string | null>(null)
+  const [logoStand, setLogoStand] = useState(0)
+  const [logoLaedt, setLogoLaedt] = useState(false)
 
   useEffect(() => {
     async function ladeProfil() {
@@ -153,6 +161,8 @@ export default function ProfilScreen() {
       setBankname(profil.bankname ?? '')
       setIban(profil.iban ?? '')
       setBic(profil.bic ?? '')
+      setAnbieterId(profil.id)
+      setLogoDatei(profil.logo_dateiname ?? null)
       setLaden(false)
     }
     void ladeProfil()
@@ -171,6 +181,24 @@ export default function ProfilScreen() {
         setOrt(r.ort)
         setBundesland(r.bundesland)
       }
+    }
+  }
+
+  async function logoWaehlen() {
+    if (!anbieterId || logoLaedt) return
+    setLogoLaedt(true)
+    try {
+      const r = await waehleUndLadeLogo(anbieterId, logoDatei)
+      if (r.ok) {
+        setLogoDatei(r.dateiname)
+        setLogoStand(Date.now()) // gleicher Dateiname → Bild-Cache umgehen
+      } else if (!r.abgebrochen) {
+        Alert.alert('Logo nicht gespeichert', r.fehler)
+      }
+    } catch {
+      Alert.alert('Logo nicht gespeichert', 'Netzwerkfehler — bitte prüfen Sie Ihre Verbindung und versuchen Sie es erneut.')
+    } finally {
+      setLogoLaedt(false)
     }
   }
 
@@ -430,6 +458,38 @@ export default function ProfilScreen() {
           <Text style={styles.cardTitle}>Geschäftsdaten für Angebote</Text>
           <Text style={styles.hinweis}>Werden auf erzeugten Angebots-PDFs verwendet.</Text>
 
+          <Text style={styles.feldLabel}>Firmenlogo (optional)</Text>
+          <View style={styles.logoZeile}>
+            {anbieterId && logoDatei ? (
+              <Image
+                source={{ uri: `${logoUrl(anbieterId, logoDatei)}${logoStand ? `?t=${logoStand}` : ''}` }}
+                style={styles.logoBild}
+                resizeMode="contain"
+                accessibilityLabel="Ihr Firmenlogo"
+              />
+            ) : (
+              <View style={[styles.logoBild, styles.logoLeer]}>
+                <Text style={styles.hinweis}>Kein Logo</Text>
+              </View>
+            )}
+            <Pressable
+              style={[styles.logoKnopf, logoLaedt && styles.btnDisabled]}
+              onPress={() => void logoWaehlen()}
+              disabled={logoLaedt}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: logoLaedt, busy: logoLaedt }}
+            >
+              {logoLaedt ? (
+                <ActivityIndicator color={C.primary} />
+              ) : (
+                <Text style={styles.logoKnopfText}>{logoDatei ? 'Logo ersetzen' : 'Logo wählen'}</Text>
+              )}
+            </Pressable>
+          </View>
+          <Text style={styles.hinweis}>
+            PNG oder JPG aus Ihren Fotos. Große Bilder werden automatisch verkleinert.
+          </Text>
+
           <Text style={styles.feldLabel}>USt-ID (optional)</Text>
           <TextInput
             style={styles.input}
@@ -543,6 +603,26 @@ const styles = StyleSheet.create({
   hakenAus: { fontSize: 16, color: C.muted },
   hakenText: { fontSize: 13, color: C.text, lineHeight: 19 },
   link: { color: C.primary, textDecorationLine: 'underline' },
+  logoZeile: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  logoBild: {
+    width: 96,
+    height: 56,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: '#fff',
+  },
+  logoLeer: { alignItems: 'center', justifyContent: 'center', borderStyle: 'dashed', backgroundColor: C.field },
+  logoKnopf: {
+    borderWidth: 1,
+    borderColor: C.primary,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  logoKnopfText: { color: C.primary, fontSize: 13, fontWeight: '600' },
   warnung: { fontSize: 12, color: C.accent },
   fehlerText: { fontSize: 15, color: C.muted, textAlign: 'center', lineHeight: 22 },
   primaryBtn: {
