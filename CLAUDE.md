@@ -158,7 +158,7 @@ Ob und für wen es ein Ergebnis gibt (nur VOB/A-Ausschreibungen, nur Bieter),
 entscheidet `/api/auftrag/submissionsergebnis/[id]` — die App fragt nur nach
 Fristablauf und zeigt bei `status: 'ok'` an, sonst nichts.
 Ebenso die **Bieterfragen** (seit 26.10.2026, `src/components/Rueckfragen.tsx`):
-Nummer (F-n, M-n), Zuordnung Antwort → Frage und wer eine offene Frage sieht,
+Nummer (F-n, M-n), Zuordnung Antwort → Frage und wer eine offene Frage sieht (Betrieb des Fragestellers + Vergabestelle),
 entscheidet die Datenbank (Trigger + RLS, `../vergabo/docs/migration-bieterfragen-nummern.sql`);
 gesendet wird über `/api/rueckfrage`, das auch alle Interessenten benachrichtigt.
 Die App ordnet nur an — die Benachrichtigungslogik von früher (Bieter direkt aus

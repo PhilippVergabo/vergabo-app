@@ -17,7 +17,8 @@ import { C } from '@/lib/theme'
 // (Modell: vergabo/lib/bieterfragen.ts, seit 26.10.2026):
 //
 //   • Frage eines Betriebs: feste Nummer F-n. Bis zur Antwort sehen sie nur
-//     der Fragesteller und die Vergabestelle (RLS), danach alle — ohne Namen.
+//     der Betrieb des Fragestellers und die Vergabestelle (RLS), danach alle —
+//     ohne Namen.
 //   • Antwort der Vergabestelle hängt an genau einer Frage.
 //   • Mitteilung der Vergabestelle ohne Frage: M-n.
 //
@@ -46,6 +47,7 @@ type Eintrag = {
   text: string
   erstelltAm: string
   autorId: string
+  freigegeben: boolean
   antworten: Antwort[]
 }
 
@@ -71,6 +73,7 @@ function ordne(zeilen: Zeile[]): Eintrag[] {
       text: z.nachricht,
       erstelltAm: z.erstellt_am,
       autorId: z.autor_id,
+      freigegeben: art === 'mitteilung' || z.freigegeben_am != null,
       antworten: [],
     }
     eintraege.push(e)
@@ -81,20 +84,21 @@ function ordne(zeilen: Zeile[]): Eintrag[] {
     const frage = z.antwort_auf ? nachId.get(z.antwort_auf) : undefined
     if (frage && frage.art === 'frage') {
       frage.antworten.push({ id: z.id, text: z.nachricht, erstelltAm: z.erstellt_am })
+      frage.freigegeben = true
     } else {
       eintraege.push({
         id: z.id, art: 'antwort_ohne_frage', kennung: 'A', text: z.nachricht,
-        erstelltAm: z.erstellt_am, autorId: z.autor_id, antworten: [],
+        erstelltAm: z.erstellt_am, autorId: z.autor_id, freigegeben: true, antworten: [],
       })
     }
   }
   return eintraege.sort((a, b) => zeit(a.erstelltAm) - zeit(b.erstelltAm))
 }
 
-function titelVon(e: Eintrag, eigene: boolean) {
+function titelVon(e: Eintrag, eigene: boolean, ausMeinemBetrieb: boolean) {
   if (e.art === 'mitteilung') return 'Mitteilung der Vergabestelle'
   if (e.art === 'antwort_ohne_frage') return 'Antwort der Vergabestelle'
-  return eigene ? 'Ihre Frage' : 'Frage eines Bieters'
+  return eigene ? 'Ihre Frage' : ausMeinemBetrieb ? 'Frage aus Ihrem Betrieb' : 'Frage eines Bieters'
 }
 
 export function Rueckfragen({
@@ -170,7 +174,7 @@ export function Rueckfragen({
       if (!istVergabestelle) {
         Alert.alert(
           `Frage ${antwort?.kennung ?? ''} gesendet`,
-          'Ihre Frage sieht zunächst nur die Vergabestelle. Mit der Antwort sehen alle Bieter Frage und Antwort – ohne Ihren Namen.',
+          'Ihre Frage sehen zunächst nur die Vergabestelle und Ihr Betrieb. Mit der Antwort sehen alle Bieter Frage und Antwort – ohne Ihren Namen.',
         )
       }
       setNachricht('')
@@ -208,11 +212,14 @@ export function Rueckfragen({
           {eintraege.map((e) => {
             const eigene = e.art === 'frage' && e.autorId === userId
             const istOffen = e.art === 'frage' && e.antworten.length === 0
+            // Eine offene fremde Frage liefert die RLS einem Betrieb nur, wenn
+            // sie aus seinem eigenen Betrieb stammt.
+            const ausMeinemBetrieb = !istVergabestelle && e.art === 'frage' && !e.freigegeben && !eigene
             return (
               <View key={e.id} style={[styles.eintrag, e.art !== 'frage' && styles.eintragAg]}>
                 <Text style={styles.kopf}>
                   <Text style={styles.kennung}>{e.kennung}</Text>
-                  {'  '}{titelVon(e, eigene)} · {formatZeit(e.erstelltAm)}
+                  {'  '}{titelVon(e, eigene, ausMeinemBetrieb)} · {formatZeit(e.erstelltAm)}
                 </Text>
                 <Text style={styles.text}>{e.text}</Text>
                 {e.antworten.map((a) => (
@@ -225,7 +232,7 @@ export function Rueckfragen({
                   <Text style={styles.offen}>
                     {istVergabestelle
                       ? 'Noch nicht beantwortet – die übrigen Bieter sehen die Frage erst mit Ihrer Antwort.'
-                      : 'Noch nicht beantwortet – nur für Sie und die Vergabestelle sichtbar.'}
+                      : 'Noch nicht beantwortet – nur für Ihren Betrieb und die Vergabestelle sichtbar.'}
                   </Text>
                 ) : null}
               </View>
@@ -291,7 +298,7 @@ export function Rueckfragen({
       <Text style={styles.hinweis}>
         {istVergabestelle
           ? 'Antworten und Mitteilungen sehen alle Interessenten; sie werden benachrichtigt. Der Name des Fragestellers erscheint nie.'
-          : 'Ihre Frage sieht zunächst nur die Vergabestelle. Mit der Antwort sehen alle Bieter Frage und Antwort – ohne Ihren Namen.'}
+          : 'Ihre Frage sehen zunächst nur die Vergabestelle und Ihr Betrieb. Mit der Antwort sehen alle Bieter Frage und Antwort – ohne Ihren Namen.'}
       </Text>
     </View>
   )
