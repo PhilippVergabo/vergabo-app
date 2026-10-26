@@ -10,24 +10,91 @@ import {
 } from 'react-native'
 import { supabase } from '@/lib/supabase'
 import { authedFetch } from '@/lib/authedFetch'
+import { meinAuftraggeberId } from '@/lib/mitgliedschaft'
 import { C } from '@/lib/theme'
 
-// Spiegel von vergabo/components/Rueckfragen.tsx (Web). Öffentliches Q&A zum
-// Auftrag: Es werden nur Rollen-Badges gezeigt, keine Firmennamen (gewollt).
-// Die RLS erlaubt Fragen auch schon VOR einer Bewerbung, solange der Auftrag
-// veröffentlicht ist. Rollen-Badge bewusst über die auftraggeber_oeffentlich-
-// user_id ermittelt (profiles ist Own-Row-RLS und für fremde Autoren leer).
+// Bieterfragen zum Auftrag — Spiegel von vergabo/components/Rueckfragen.tsx
+// (Modell: vergabo/lib/bieterfragen.ts, seit 26.10.2026):
+//
+//   • Frage eines Betriebs: feste Nummer F-n. Bis zur Antwort sehen sie nur
+//     der Fragesteller und die Vergabestelle (RLS), danach alle — ohne Namen.
+//   • Antwort der Vergabestelle hängt an genau einer Frage.
+//   • Mitteilung der Vergabestelle ohne Frage: M-n.
+//
+// Gesendet wird über /api/rueckfrage: Dort entscheidet die Mitgliedschaft, wer
+// was ist, und dort laufen die Benachrichtigungen (an alle Interessenten).
+// Nummer, Art und Sichtbarkeit kommen aus der Datenbank; hier wird nur
+// angeordnet — keine doppelt gehaltene Regel.
 
-type Rueckfrage = {
+type Zeile = {
   id: string
   autor_id: string
   nachricht: string
   erstellt_am: string
+  art: string | null
+  nummer: number | null
+  antwort_auf: string | null
+  freigegeben_am: string | null
+}
+
+type Antwort = { id: string; text: string; erstelltAm: string }
+
+type Eintrag = {
+  id: string
+  art: 'frage' | 'mitteilung' | 'antwort_ohne_frage'
+  kennung: string
+  text: string
+  erstelltAm: string
+  autorId: string
+  antworten: Antwort[]
 }
 
 function formatZeit(iso: string) {
   const d = new Date(iso)
   return `${d.toLocaleDateString('de-DE')} ${d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`
+}
+
+const zeit = (iso: string) => new Date(iso).getTime()
+
+/** Fragen mit ihren Antworten, Mitteilungen, verwaiste Antworten — wie im Web. */
+function ordne(zeilen: Zeile[]): Eintrag[] {
+  const sortiert = [...zeilen].sort((a, b) => zeit(a.erstellt_am) - zeit(b.erstellt_am))
+  const eintraege: Eintrag[] = []
+  const nachId = new Map<string, Eintrag>()
+  for (const z of sortiert) {
+    if (z.art === 'antwort') continue
+    const art = z.art === 'mitteilung' ? 'mitteilung' : 'frage'
+    const e: Eintrag = {
+      id: z.id,
+      art,
+      kennung: `${art === 'frage' ? 'F' : 'M'}-${z.nummer ?? '?'}`,
+      text: z.nachricht,
+      erstelltAm: z.erstellt_am,
+      autorId: z.autor_id,
+      antworten: [],
+    }
+    eintraege.push(e)
+    nachId.set(z.id, e)
+  }
+  for (const z of sortiert) {
+    if (z.art !== 'antwort') continue
+    const frage = z.antwort_auf ? nachId.get(z.antwort_auf) : undefined
+    if (frage && frage.art === 'frage') {
+      frage.antworten.push({ id: z.id, text: z.nachricht, erstelltAm: z.erstellt_am })
+    } else {
+      eintraege.push({
+        id: z.id, art: 'antwort_ohne_frage', kennung: 'A', text: z.nachricht,
+        erstelltAm: z.erstellt_am, autorId: z.autor_id, antworten: [],
+      })
+    }
+  }
+  return eintraege.sort((a, b) => zeit(a.erstelltAm) - zeit(b.erstelltAm))
+}
+
+function titelVon(e: Eintrag, eigene: boolean) {
+  if (e.art === 'mitteilung') return 'Mitteilung der Vergabestelle'
+  if (e.art === 'antwort_ohne_frage') return 'Antwort der Vergabestelle'
+  return eigene ? 'Ihre Frage' : 'Frage eines Bieters'
 }
 
 export function Rueckfragen({
@@ -38,34 +105,32 @@ export function Rueckfragen({
   /** Optional: wird beim Fokussieren des Eingabefelds aufgerufen (Scroll-Anpassung). */
   onEingabeFokus?: () => void
 }) {
-  const [nachrichten, setNachrichten] = useState<Rueckfrage[]>([])
+  const [eintraege, setEintraege] = useState<Eintrag[]>([])
   const [nachricht, setNachricht] = useState('')
   const [laden, setLaden] = useState(true)
   const [senden, setSenden] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
-  const [agUserId, setAgUserId] = useState<string | null>(null)
-  const [auftragTitel, setAuftragTitel] = useState('')
+  // Nur Oberfläche — /api/rueckfrage prüft die Mitgliedschaft selbst.
+  const [istVergabestelle, setIstVergabestelle] = useState(false)
+  // Vergabestelle: ID der beantworteten Frage oder 'mitteilung'.
+  const [ziel, setZiel] = useState<string>('')
 
   const load = useCallback(async () => {
-    const [{ data: sessionData }, { data: fragen }, { data: auftrag }] = await Promise.all([
+    const [{ data: sessionData }, { data: zeilen }, { data: auftrag }] = await Promise.all([
       supabase.auth.getSession(),
       supabase
         .from('rückfragen')
-        .select('id, autor_id, nachricht, erstellt_am')
+        .select('id, autor_id, nachricht, erstellt_am, art, nummer, antwort_auf, freigegeben_am')
         .eq('auftrag_id', auftragId)
         .order('erstellt_am', { ascending: true }),
-      supabase.from('auftraege').select('titel, auftraggeber_id').eq('id', auftragId).single(),
+      supabase.from('auftraege').select('auftraggeber_id').eq('id', auftragId).single(),
     ])
-    setUserId(sessionData.session?.user.id ?? null)
-    setNachrichten((fragen as Rueckfrage[]) ?? [])
-    setAuftragTitel(auftrag?.titel ?? '')
-    if (auftrag?.auftraggeber_id) {
-      const { data: ag } = await supabase
-        .from('auftraggeber_oeffentlich')
-        .select('user_id')
-        .eq('id', auftrag.auftraggeber_id)
-        .single()
-      setAgUserId((ag?.user_id as string | null) ?? null)
+    const uid = sessionData.session?.user.id ?? null
+    setUserId(uid)
+    setEintraege(ordne((zeilen as Zeile[] | null) ?? []))
+    if (uid && auftrag?.auftraggeber_id) {
+      const meineStelle = await meinAuftraggeberId(uid)
+      setIstVergabestelle(meineStelle === auftrag.auftraggeber_id)
     }
   }, [auftragId])
 
@@ -76,85 +141,57 @@ export function Rueckfragen({
     load().finally(() => setLaden(false))
   }, [load])
 
-  // Benachrichtigung an die andere Partei – Spiegel der Web-Logik; Fehler
-  // hier bewusst still (die Rückfrage selbst ist bereits gespeichert).
-  const benachrichtigen = useCallback(
-    async (eigeneIstAuftraggeber: boolean) => {
-      try {
-        const { data: sessionData } = await supabase.auth.getSession()
-        if (!sessionData.session?.access_token) return
-        const post = (typ: string, empfaengerId: string) =>
-          authedFetch('/api/benachrichtigung', {
-            method: 'POST',
-            body: JSON.stringify({
-              typ,
-              userId: empfaengerId,
-              auftragId,
-              daten: { auftragTitel, link: `/auftraege/${auftragId}` },
-            }),
-          })
-        if (!eigeneIstAuftraggeber) {
-          // Anbieter fragt → Auftraggeber benachrichtigen
-          if (agUserId) await post('rueckfrage', agUserId)
-        } else {
-          // Auftraggeber antwortet → alle Bieter benachrichtigen
-          const { data: bews } = await supabase
-            .from('bewerbungen')
-            .select('anbieter_id')
-            .eq('auftrag_id', auftragId)
-          const anbIds = [...new Set((bews ?? []).map((b) => b.anbieter_id))]
-          if (anbIds.length) {
-            const { data: anbUsers } = await supabase
-              .from('anbieter_oeffentlich')
-              .select('user_id')
-              .in('id', anbIds)
-            for (const u of anbUsers ?? []) {
-              if (u.user_id) await post('rueckfrage_antwort', u.user_id as string)
-            }
-          }
-        }
-      } catch {
-        // still – Benachrichtigung ist Best-Effort
-      }
-    },
-    [agUserId, auftragId, auftragTitel],
-  )
+  const offen = eintraege.filter((e) => e.art === 'frage' && e.antworten.length === 0)
 
   async function handleSenden() {
     const text = nachricht.trim()
     if (!text || !userId || senden) return
-    setSenden(true)
-
-    const { error } = await supabase.from('rückfragen').insert({
-      auftrag_id: auftragId,
-      autor_id: userId,
-      nachricht: text,
-    })
-
-    if (error) {
-      Alert.alert(
-        'Senden fehlgeschlagen',
-        'Die Rückfrage konnte nicht gesendet werden. Bitte später erneut versuchen.',
-      )
-      setSenden(false)
+    if (istVergabestelle && !ziel) {
+      Alert.alert('Antwort auf …', 'Bitte wählen Sie die Frage oder „Mitteilung an alle“.')
       return
     }
-
-    setNachricht('')
-    await load()
-    await benachrichtigen(userId === agUserId)
-    setSenden(false)
+    setSenden(true)
+    try {
+      const res = await authedFetch('/api/rueckfrage', {
+        method: 'POST',
+        body: JSON.stringify({
+          auftrag_id: auftragId,
+          nachricht: text,
+          ...(istVergabestelle
+            ? ziel === 'mitteilung' ? { mitteilung: true } : { antwort_auf: ziel }
+            : {}),
+        }),
+      })
+      const antwort = (await res.json().catch(() => null)) as { error?: string; kennung?: string } | null
+      if (!res.ok) {
+        Alert.alert('Senden fehlgeschlagen', antwort?.error ?? 'Bitte später erneut versuchen.')
+        return
+      }
+      if (!istVergabestelle) {
+        Alert.alert(
+          `Frage ${antwort?.kennung ?? ''} gesendet`,
+          'Ihre Frage sieht zunächst nur die Vergabestelle. Mit der Antwort sehen alle Bieter Frage und Antwort – ohne Ihren Namen.',
+        )
+      }
+      setNachricht('')
+      setZiel('')
+      await load()
+    } catch {
+      Alert.alert('Senden fehlgeschlagen', 'Keine Verbindung. Bitte später erneut versuchen.')
+    } finally {
+      setSenden(false)
+    }
   }
 
   return (
     <View style={styles.card}>
       <View style={styles.kopfZeile}>
-        <Text style={styles.cardTitle}>Rückfragen ({nachrichten.length})</Text>
+        <Text style={styles.cardTitle}>Bieterfragen ({eintraege.length})</Text>
         <Pressable
           onPress={() => load()}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel="Rückfragen aktualisieren"
+          accessibilityLabel="Bieterfragen aktualisieren"
         >
           <Text style={styles.aktualisieren}>Aktualisieren</Text>
         </Pressable>
@@ -162,32 +199,69 @@ export function Rueckfragen({
 
       {laden ? (
         <ActivityIndicator color={C.primary} style={{ paddingVertical: 16 }} />
-      ) : nachrichten.length === 0 ? (
+      ) : eintraege.length === 0 ? (
         <Text style={styles.leerText}>
-          Noch keine Rückfragen. Sie können auch vor der Angebotsabgabe Fragen stellen.
+          Noch keine Bieterfragen. Sie können auch vor der Angebotsabgabe Fragen stellen.
         </Text>
       ) : (
-        <View style={styles.thread}>
-          {nachrichten.map((msg) => {
-            const istAuftraggeber = agUserId != null && msg.autor_id === agUserId
-            const istEigene = msg.autor_id === userId
+        <View style={styles.liste}>
+          {eintraege.map((e) => {
+            const eigene = e.art === 'frage' && e.autorId === userId
+            const istOffen = e.art === 'frage' && e.antworten.length === 0
             return (
-              <View
-                key={msg.id}
-                style={[styles.bubbleZeile, istEigene ? styles.zeileRechts : styles.zeileLinks]}
-              >
-                <View style={[styles.bubble, istAuftraggeber ? styles.bubbleAg : styles.bubbleAnb]}>
-                  <Text style={styles.bubbleRolle}>
-                    {istAuftraggeber ? '🏛️ Auftraggeber' : '🔧 Anbieter'}
+              <View key={e.id} style={[styles.eintrag, e.art !== 'frage' && styles.eintragAg]}>
+                <Text style={styles.kopf}>
+                  <Text style={styles.kennung}>{e.kennung}</Text>
+                  {'  '}{titelVon(e, eigene)} · {formatZeit(e.erstelltAm)}
+                </Text>
+                <Text style={styles.text}>{e.text}</Text>
+                {e.antworten.map((a) => (
+                  <View key={a.id} style={styles.antwort}>
+                    <Text style={styles.kopf}>🏛️ Antwort der Vergabestelle · {formatZeit(a.erstelltAm)}</Text>
+                    <Text style={styles.text}>{a.text}</Text>
+                  </View>
+                ))}
+                {istOffen ? (
+                  <Text style={styles.offen}>
+                    {istVergabestelle
+                      ? 'Noch nicht beantwortet – die übrigen Bieter sehen die Frage erst mit Ihrer Antwort.'
+                      : 'Noch nicht beantwortet – nur für Sie und die Vergabestelle sichtbar.'}
                   </Text>
-                  <Text style={styles.bubbleText}>{msg.nachricht}</Text>
-                  <Text style={styles.bubbleZeit}>{formatZeit(msg.erstellt_am)}</Text>
-                </View>
+                ) : null}
               </View>
             )
           })}
         </View>
       )}
+
+      {istVergabestelle ? (
+        <View style={styles.zielBlock}>
+          <Text style={styles.zielLabel}>Antwort auf</Text>
+          <View style={styles.chips}>
+            {offen.map((f) => (
+              <Pressable
+                key={f.id}
+                onPress={() => setZiel(f.id)}
+                style={[styles.chip, ziel === f.id && styles.chipAktiv]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: ziel === f.id }}
+              >
+                <Text style={[styles.chipText, ziel === f.id && styles.chipTextAktiv]}>{f.kennung}</Text>
+              </Pressable>
+            ))}
+            <Pressable
+              onPress={() => setZiel('mitteilung')}
+              style={[styles.chip, ziel === 'mitteilung' && styles.chipAktiv]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: ziel === 'mitteilung' }}
+            >
+              <Text style={[styles.chipText, ziel === 'mitteilung' && styles.chipTextAktiv]}>
+                Mitteilung an alle
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
 
       <View style={styles.eingabeZeile}>
         <TextInput
@@ -195,24 +269,30 @@ export function Rueckfragen({
           value={nachricht}
           onChangeText={setNachricht}
           onFocus={onEingabeFokus}
-          placeholder="Frage stellen oder antworten …"
+          placeholder={istVergabestelle ? 'Antwort oder Mitteilung …' : 'Frage an die Vergabestelle …'}
           placeholderTextColor={C.muted}
           multiline
+          maxLength={4000}
           returnKeyType="send"
           submitBehavior="blurAndSubmit"
           onSubmitEditing={handleSenden}
-          accessibilityLabel="Frage stellen oder antworten"
+          accessibilityLabel={istVergabestelle ? 'Antwort oder Mitteilung' : 'Frage an die Vergabestelle'}
         />
         <Pressable
           style={[styles.sendenBtn, (!nachricht.trim() || senden) && styles.sendenBtnAus]}
           onPress={handleSenden}
           disabled={!nachricht.trim() || senden}
           accessibilityRole="button"
-          accessibilityLabel="Rückfrage senden"
+          accessibilityLabel="Senden"
         >
           <Text style={styles.sendenText}>{senden ? '…' : 'Senden'}</Text>
         </Pressable>
       </View>
+      <Text style={styles.hinweis}>
+        {istVergabestelle
+          ? 'Antworten und Mitteilungen sehen alle Interessenten; sie werden benachrichtigt. Der Name des Fragestellers erscheint nie.'
+          : 'Ihre Frage sieht zunächst nur die Vergabestelle. Mit der Antwort sehen alle Bieter Frage und Antwort – ohne Ihren Namen.'}
+      </Text>
     </View>
   )
 }
@@ -236,16 +316,42 @@ const styles = StyleSheet.create({
   },
   aktualisieren: { fontSize: 12, fontWeight: '600', color: C.primary },
   leerText: { fontSize: 14, color: C.muted, textAlign: 'center', paddingVertical: 8 },
-  thread: { gap: 10 },
-  bubbleZeile: { flexDirection: 'row' },
-  zeileLinks: { justifyContent: 'flex-start' },
-  zeileRechts: { justifyContent: 'flex-end' },
-  bubble: { maxWidth: '85%', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
-  bubbleAg: { backgroundColor: C.ok },
-  bubbleAnb: { backgroundColor: C.field },
-  bubbleRolle: { fontSize: 11, fontWeight: '600', color: C.muted, marginBottom: 3 },
-  bubbleText: { fontSize: 14, color: C.text, lineHeight: 20 },
-  bubbleZeit: { fontSize: 11, color: C.muted, marginTop: 4 },
+  liste: { gap: 10 },
+  eintrag: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.field,
+    padding: 12,
+    gap: 4,
+  },
+  eintragAg: { backgroundColor: C.ok, borderColor: '#3a5a3e33' },
+  kopf: { fontSize: 11, color: C.muted },
+  kennung: { fontSize: 12, fontWeight: '700', color: C.text },
+  text: { fontSize: 14, color: C.text, lineHeight: 20 },
+  antwort: {
+    marginTop: 6,
+    marginLeft: 6,
+    paddingLeft: 10,
+    borderLeftWidth: 2,
+    borderLeftColor: C.primary,
+    gap: 2,
+  },
+  offen: { fontSize: 12, color: C.accent, marginTop: 4 },
+  zielBlock: { gap: 6 },
+  zielLabel: { fontSize: 12, color: C.muted },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: {
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: C.field,
+  },
+  chipAktiv: { backgroundColor: C.primary, borderColor: C.primary },
+  chipText: { fontSize: 13, color: C.text, fontWeight: '600' },
+  chipTextAktiv: { color: '#ffffff' },
   eingabeZeile: { flexDirection: 'row', gap: 8, alignItems: 'flex-end' },
   eingabe: {
     flex: 1,
@@ -267,4 +373,5 @@ const styles = StyleSheet.create({
   },
   sendenBtnAus: { opacity: 0.5 },
   sendenText: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
+  hinweis: { fontSize: 12, color: C.muted, lineHeight: 17 },
 })
