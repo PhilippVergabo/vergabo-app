@@ -26,10 +26,15 @@ import { C } from '@/lib/theme'
 // was ist, und dort laufen die Benachrichtigungen (an alle Interessenten).
 // Nummer, Art und Sichtbarkeit kommen aus der Datenbank; hier wird nur
 // angeordnet — keine doppelt gehaltene Regel.
+//
+// ⚠️ Kein `autor_id` mehr (seit 26.10.2026): Über `anbieter_oeffentlich.user_id`
+// verriet sie den fragenden Betrieb. „Ihre Frage“ / „Frage aus Ihrem Betrieb“
+// liefert die Funktion `meine_bieterfragen`, die nur die eigenen Fragen kennt.
+// Das Leserecht auf `autor_id` wird entzogen, sobald keine App-Stände von
+// davor mehr laufen — deshalb darf diese Datei die Spalte nie wieder abfragen.
 
 type Zeile = {
   id: string
-  autor_id: string
   nachricht: string
   erstellt_am: string
   art: string | null
@@ -46,7 +51,8 @@ type Eintrag = {
   kennung: string
   text: string
   erstelltAm: string
-  autorId: string
+  /** Nur Fragen: selbst gestellt, aus dem eigenen Betrieb oder fremd. */
+  herkunft: 'eigene' | 'betrieb' | null
   freigegeben: boolean
   antworten: Antwort[]
 }
@@ -59,7 +65,7 @@ function formatZeit(iso: string) {
 const zeit = (iso: string) => new Date(iso).getTime()
 
 /** Fragen mit ihren Antworten, Mitteilungen, verwaiste Antworten — wie im Web. */
-function ordne(zeilen: Zeile[]): Eintrag[] {
+function ordne(zeilen: Zeile[], meine: ReadonlyMap<string, boolean>): Eintrag[] {
   const sortiert = [...zeilen].sort((a, b) => zeit(a.erstellt_am) - zeit(b.erstellt_am))
   const eintraege: Eintrag[] = []
   const nachId = new Map<string, Eintrag>()
@@ -72,7 +78,7 @@ function ordne(zeilen: Zeile[]): Eintrag[] {
       kennung: `${art === 'frage' ? 'F' : 'M'}-${z.nummer ?? '?'}`,
       text: z.nachricht,
       erstelltAm: z.erstellt_am,
-      autorId: z.autor_id,
+      herkunft: art !== 'frage' || !meine.has(z.id) ? null : meine.get(z.id) ? 'eigene' : 'betrieb',
       freigegeben: art === 'mitteilung' || z.freigegeben_am != null,
       antworten: [],
     }
@@ -88,17 +94,19 @@ function ordne(zeilen: Zeile[]): Eintrag[] {
     } else {
       eintraege.push({
         id: z.id, art: 'antwort_ohne_frage', kennung: 'A', text: z.nachricht,
-        erstelltAm: z.erstellt_am, autorId: z.autor_id, freigegeben: true, antworten: [],
+        erstelltAm: z.erstellt_am, herkunft: null, freigegeben: true, antworten: [],
       })
     }
   }
   return eintraege.sort((a, b) => zeit(a.erstelltAm) - zeit(b.erstelltAm))
 }
 
-function titelVon(e: Eintrag, eigene: boolean, ausMeinemBetrieb: boolean) {
+function titelVon(e: Eintrag) {
   if (e.art === 'mitteilung') return 'Mitteilung der Vergabestelle'
   if (e.art === 'antwort_ohne_frage') return 'Antwort der Vergabestelle'
-  return eigene ? 'Ihre Frage' : ausMeinemBetrieb ? 'Frage aus Ihrem Betrieb' : 'Frage eines Bieters'
+  return e.herkunft === 'eigene' ? 'Ihre Frage'
+    : e.herkunft === 'betrieb' ? 'Frage aus Ihrem Betrieb'
+      : 'Frage eines Bieters'
 }
 
 export function Rueckfragen({
@@ -120,18 +128,21 @@ export function Rueckfragen({
   const [ziel, setZiel] = useState<string>('')
 
   const load = useCallback(async () => {
-    const [{ data: sessionData }, { data: zeilen }, { data: auftrag }] = await Promise.all([
+    const [{ data: sessionData }, { data: zeilen }, { data: auftrag }, { data: meine }] = await Promise.all([
       supabase.auth.getSession(),
       supabase
         .from('rückfragen')
-        .select('id, autor_id, nachricht, erstellt_am, art, nummer, antwort_auf, freigegeben_am')
+        .select('id, nachricht, erstellt_am, art, nummer, antwort_auf, freigegeben_am')
         .eq('auftrag_id', auftragId)
         .order('erstellt_am', { ascending: true }),
       supabase.from('auftraege').select('auftraggeber_id').eq('id', auftragId).single(),
+      // Fehlt die Funktion (noch) oder scheitert sie, fehlt nur die Markierung.
+      supabase.rpc('meine_bieterfragen', { p_auftrag_id: auftragId }),
     ])
     const uid = sessionData.session?.user.id ?? null
     setUserId(uid)
-    setEintraege(ordne((zeilen as Zeile[] | null) ?? []))
+    const eigene = new Map(((meine as { id: string; eigene: boolean }[] | null) ?? []).map((m) => [m.id, m.eigene]))
+    setEintraege(ordne((zeilen as Zeile[] | null) ?? [], eigene))
     if (uid && auftrag?.auftraggeber_id) {
       const meineStelle = await meinAuftraggeberId(uid)
       setIstVergabestelle(meineStelle === auftrag.auftraggeber_id)
@@ -210,16 +221,12 @@ export function Rueckfragen({
       ) : (
         <View style={styles.liste}>
           {eintraege.map((e) => {
-            const eigene = e.art === 'frage' && e.autorId === userId
             const istOffen = e.art === 'frage' && e.antworten.length === 0
-            // Eine offene fremde Frage liefert die RLS einem Betrieb nur, wenn
-            // sie aus seinem eigenen Betrieb stammt.
-            const ausMeinemBetrieb = !istVergabestelle && e.art === 'frage' && !e.freigegeben && !eigene
             return (
               <View key={e.id} style={[styles.eintrag, e.art !== 'frage' && styles.eintragAg]}>
                 <Text style={styles.kopf}>
                   <Text style={styles.kennung}>{e.kennung}</Text>
-                  {'  '}{titelVon(e, eigene, ausMeinemBetrieb)} · {formatZeit(e.erstelltAm)}
+                  {'  '}{titelVon(e)} · {formatZeit(e.erstelltAm)}
                 </Text>
                 <Text style={styles.text}>{e.text}</Text>
                 {e.antworten.map((a) => (
