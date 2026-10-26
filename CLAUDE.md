@@ -150,7 +150,13 @@ Gegenbeispiel, richtig gemacht: `nachweis_aktualitaet` („Sind Ihre Nachweise
 noch aktuell?“, nach 2 Jahren, seit 24.10.2026) führt auf die Nachweisseite,
 und dort steht die passende Karte samt Bestätigen-Knopf. Die App rechnet die
 Fälligkeit **nicht** selbst, sie fragt `/api/eigenerklarung/aktualitaet` (GET
-fällig, POST bestätigen) — die Regel liegt nur im Web.
+fällig, POST bestätigen) — die Regel liegt nur im Web. Genauso
+`submissionsergebnis` („Ergebnis der Öffnung“, § 14 Abs. 6 VOB/A, seit
+26.10.2026): führt auf die Auftragsseite, dort zeigt
+`src/components/Submissionsergebnis.tsx` Bieter, Anschriften und Endbeträge.
+Ob und für wen es ein Ergebnis gibt (nur VOB/A-Ausschreibungen, nur Bieter),
+entscheidet `/api/auftrag/submissionsergebnis/[id]` — die App fragt nur nach
+Fristablauf und zeigt bei `status: 'ok'` an, sonst nichts.
 
 ⚠️ **„Eigenerklärung ohne Datei" ist überall derselbe Sonderfall — an drei Stellen.** Ein angehakter Nachweis ohne hochgeladenes Dokument kann von niemandem geprüft werden; die Erklärung selbst ist der Nachweis. Deshalb: `components/admin/NachweisBadge.tsx` (`istOffenerNachweis` — kein Badge „in Prüfung", keine Freigabe-Knöpfe, nicht mitgezählt), `src/app/eigenerklarungen.tsx` (Anbieter-Sicht: „✓ bestätigt" statt „⏳ in Prüfung" — sonst wartet der Betrieb auf einen Zustand, der nie eintritt; seit 24.09.2026), und im Web `/api/app-admin/anbieter` (`.not('dateiname','is',null)` bei der Zählung) plus `/api/app-admin/eigenerklarungen` (Feld `pruefung_noetig`). **Wer eine dieser Stellen anfasst, prüft die anderen mit.**
 

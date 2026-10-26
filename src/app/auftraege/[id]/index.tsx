@@ -23,6 +23,7 @@ import { sanitizeDateiname } from '@/lib/eigenerklarungTypen'
 import { gewerkLabel } from '@/lib/labels'
 import { AuftragAnhaenge } from '@/components/AuftragAnhaenge'
 import { Rueckfragen } from '@/components/Rueckfragen'
+import { SubmissionsergebnisKarte, type Submissionsergebnis } from '@/components/Submissionsergebnis'
 import { C } from '@/lib/theme'
 
 type AuftragDetail = {
@@ -94,6 +95,9 @@ export default function AuftragDetailScreen() {
   // Budgetstufe von der Web-Plattform (nur veröffentlichte Aufträge), nie der
   // Betrag — `budget_bis` liest die App seit dem Sicherheits-Audit nicht mehr.
   const [budgetText, setBudgetText] = useState<string | null>(null)
+  // Ergebnis der Öffnung (§ 14 Abs. 6 VOB/A) — nur für Bieter, nur bei
+  // Ausschreibungen nach VOB/A; ob es eines gibt, entscheidet das Web.
+  const [submission, setSubmission] = useState<Submissionsergebnis | null>(null)
   const scrollRef = useRef<ScrollView>(null)
 
   const laden = useCallback(async () => {
@@ -137,6 +141,23 @@ export default function AuftragDetailScreen() {
       }
     } else {
       setNachforderungen([])
+    }
+
+    // Erst nach Fristablauf kann es ein Ergebnis geben — vorher spart das die Anfrage.
+    const fristVorbei = !!a?.frist && Date.now() >= new Date(a.frist).getTime()
+    if (meine && fristVorbei) {
+      try {
+        const res = await authedFetch(`/api/auftrag/submissionsergebnis/${id}`)
+        const antwort = res.ok
+          ? ((await res.json()) as { status?: string; ergebnis?: Submissionsergebnis })
+          : null
+        setSubmission(antwort?.status === 'ok' && antwort.ergebnis ? antwort.ergebnis : null)
+      } catch {
+        // Nicht-fatal: Die Seite funktioniert auch ohne das Ergebnis.
+        setSubmission(null)
+      }
+    } else {
+      setSubmission(null)
     }
     setLoading(false)
   }, [id])
@@ -386,6 +407,9 @@ export default function AuftragDetailScreen() {
         {auftrag.frist ? <Row label="Frist" value={formatDate(auftrag.frist)!} /> : null}
         {budgetText ? <Row label="Budget" value={budgetText} /> : null}
       </View>
+
+      {/* Ziel der Benachrichtigung „Ergebnis der Öffnung“ — deshalb oben. */}
+      {submission ? <SubmissionsergebnisKarte ergebnis={submission} /> : null}
 
       {auftrag.beschreibung ? (
         <View style={styles.section}>
