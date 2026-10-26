@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -25,6 +26,13 @@ import { C } from '@/lib/theme'
 // Die Auswahl eines Vorschlags setzt exakte Koordinaten; eine manuelle
 // Änderung an der Straße verwirft sie (→ null), dann greift der
 // PLZ-Mittelpunkt-Fallback beim Matching und Umkreis-Filter.
+//
+// Namensnennung unter „Vergebene Aufträge“ (www.vergabo.de/vergaben): Nach
+// dem Zuschlag informieren Vergabestellen öffentlich (§ 20 Abs. 3 VOB/A,
+// § 30 UVgO). GmbH, UG und KG erscheinen immer mit Namen, alle anderen
+// Rechtsformen nur mit diesem Häkchen — sonst anonym. Die Regel liegt nur im
+// Web (`../vergabo/lib/vergebeneAuftraege.ts`); hier wird nur die
+// Einwilligung gepflegt, Wortlaut wie im Web-Profil.
 
 const RECHTSFORMEN = [
   { value: 'einzelunternehmen', label: 'Einzelunternehmen' },
@@ -34,6 +42,9 @@ const RECHTSFORMEN = [
   { value: 'kg', label: 'KG' },
   { value: 'sonstiges', label: 'Sonstiges' },
 ]
+
+// Diese Rechtsformen werden ohne Einwilligung genannt (keine natürlichen Personen).
+const IMMER_NAMENTLICH = ['gmbh', 'ug', 'kg']
 
 // Wie im Web-Profil (dort 10–200 km; die Registrierung in der App endet bei 100).
 const RADIUS_OPTIONEN = [10, 25, 50, 75, 100, 150, 200]
@@ -80,6 +91,7 @@ export default function ProfilScreen() {
   const [inhaberName, setInhaberName] = useState('')
   const [rechtsform, setRechtsform] = useState('')
   const [steuernummer, setSteuernummer] = useState('')
+  const [namensnennung, setNamensnennung] = useState(false)
   const [strasse, setStrasse] = useState('')
   const [plz, setPlz] = useState('')
   const [ort, setOrt] = useState('')
@@ -125,6 +137,7 @@ export default function ProfilScreen() {
       setBewertung({ avg: profil.bewertung_avg ?? null, anzahl: profil.anzahl_bewertungen ?? 0 })
       setRechtsform(profil.rechtsform ?? '')
       setSteuernummer(profil.steuernummer ?? '')
+      setNamensnennung(profil.ex_post_namensnennung === true)
       // Straße + Hausnummer in EIN Feld (wie im Web-Profil); Altdaten mit
       // separater Hausnummer bleiben sichtbar, die Spalte wird nicht mehr genutzt.
       setStrasse([profil.strasse, profil.hausnummer].filter(Boolean).join(' '))
@@ -195,6 +208,7 @@ export default function ProfilScreen() {
           bankname: bankname.trim() || null,
           iban: iban.trim() || null,
           bic: bic.trim() || null,
+          ex_post_namensnennung: namensnennung,
         })
         // Wie beim Laden: über die Mitgliedschaft, nicht über user_id.
         .eq('id', (await meinAnbieterId(userId)) ?? KEIN_PROFIL)
@@ -288,6 +302,34 @@ export default function ProfilScreen() {
               />
             ))}
           </View>
+          {rechtsform !== '' && !IMMER_NAMENTLICH.includes(rechtsform) ? (
+            <Pressable
+              style={styles.hakenZeile}
+              onPress={() => setNamensnennung((v) => !v)}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: namensnennung }}
+            >
+              <Text style={namensnennung ? styles.hakenAn : styles.hakenAus}>
+                {namensnennung ? '✓' : '○'}
+              </Text>
+              <View style={{ flex: 1, gap: 4 }}>
+                <Text style={styles.hakenText}>
+                  Mein Firmenname darf unter{' '}
+                  <Text
+                    style={styles.link}
+                    onPress={() => void Linking.openURL('https://www.vergabo.de/vergaben')}
+                  >
+                    „Vergebene Aufträge“
+                  </Text>{' '}
+                  genannt werden, wenn ich einen Auftrag erhalte.
+                </Text>
+                <Text style={styles.hinweis}>
+                  Nach dem Zuschlag informieren Vergabestellen öffentlich über bestimmte Vergaben.
+                  Ohne Häkchen erscheint Ihr Betrieb dort ohne Namen. Jederzeit änderbar.
+                </Text>
+              </View>
+            </Pressable>
+          ) : null}
 
           <Text style={styles.feldLabel}>Steuernummer</Text>
           <TextInput
@@ -496,6 +538,11 @@ const styles = StyleSheet.create({
   optionTextAktiv: { color: C.accent },
   optionTextInaktiv: { color: C.muted },
   hinweis: { fontSize: 12, color: C.muted, lineHeight: 17 },
+  hakenZeile: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', marginTop: 4 },
+  hakenAn: { fontSize: 16, color: C.primary, fontWeight: '700' },
+  hakenAus: { fontSize: 16, color: C.muted },
+  hakenText: { fontSize: 13, color: C.text, lineHeight: 19 },
+  link: { color: C.primary, textDecorationLine: 'underline' },
   warnung: { fontSize: 12, color: C.accent },
   fehlerText: { fontSize: 15, color: C.muted, textAlign: 'center', lineHeight: 22 },
   primaryBtn: {

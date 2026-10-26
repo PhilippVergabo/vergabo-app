@@ -110,6 +110,7 @@ darunter eine rechtlich relevante Verfahrensbezeichnung.
 | `src/lib/nachweisGueltigkeit.ts` | `lib/nachweisGueltigkeit.ts` | Warnfenster (30 Tage), Statusnamen, Hinweistexte |
 | `src/lib/labels.ts` → `GEWERK_LABELS` | `lib/gewerke.ts` | Schlüssel und Labels |
 | `src/lib/bewerbung.ts` → `findePassendeEigenerklaerung` | `lib/eignungNachweis.ts` → `findeProfilNachweis` | Ist ein `nachweis_typ` verlangt, zählt **ausschließlich** dieser — sonst meldet das Formular „Aus Profil", und `/api/bewerbung/einreichen` antwortet 422 „Falscher Nachweis-Typ" |
+| `src/app/profil.tsx` → `IMMER_NAMENTLICH` | `lib/vergebeneAuftraege.ts` → `JURISTISCHE_PERSONEN` | Welche Rechtsformen unter „Vergebene Aufträge“ immer mit Namen erscheinen (GmbH, UG, KG). Nur für diese blendet die App das Einwilligungs-Häkchen aus; entschieden wird im Web |
 | `src/lib/angebotsEntwurf.ts` | `lib/angebotsEntwurf.ts` | Entwurfs-Version, 30-Tage-Grenze, was als „leer" gilt. **Gewollt anders:** Die App sichert die ausgewählten **Dateien** mit (Kopie unter `Paths.document`), der Browser kann das nicht und merkt sich nur die Namen |
 
 **Beim Anfassen einer dieser Dateien im Web immer hier gegenprüfen.** Ein
