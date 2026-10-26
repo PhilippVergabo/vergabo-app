@@ -157,6 +157,13 @@ fällig, POST bestätigen) — die Regel liegt nur im Web. Genauso
 Ob und für wen es ein Ergebnis gibt (nur VOB/A-Ausschreibungen, nur Bieter),
 entscheidet `/api/auftrag/submissionsergebnis/[id]` — die App fragt nur nach
 Fristablauf und zeigt bei `status: 'ok'` an, sonst nichts.
+Ebenso die **Bieterfragen** (seit 26.10.2026, `src/components/Rueckfragen.tsx`):
+Nummer (F-n, M-n), Zuordnung Antwort → Frage und wer eine offene Frage sieht (Betrieb des Fragestellers + Vergabestelle),
+entscheidet die Datenbank (Trigger + RLS, `../vergabo/docs/migration-bieterfragen-nummern.sql`);
+gesendet wird über `/api/rueckfrage`, das auch alle Interessenten benachrichtigt.
+Die App ordnet nur an — die Benachrichtigungslogik von früher (Bieter direkt aus
+`bewerbungen` anschreiben) ist entfallen. Ältere Builds schreiben noch direkt in
+die Tabelle; der Trigger macht daraus Frage bzw. Mitteilung.
 
 ⚠️ **„Eigenerklärung ohne Datei" ist überall derselbe Sonderfall — an drei Stellen.** Ein angehakter Nachweis ohne hochgeladenes Dokument kann von niemandem geprüft werden; die Erklärung selbst ist der Nachweis. Deshalb: `components/admin/NachweisBadge.tsx` (`istOffenerNachweis` — kein Badge „in Prüfung", keine Freigabe-Knöpfe, nicht mitgezählt), `src/app/eigenerklarungen.tsx` (Anbieter-Sicht: „✓ bestätigt" statt „⏳ in Prüfung" — sonst wartet der Betrieb auf einen Zustand, der nie eintritt; seit 24.09.2026), und im Web `/api/app-admin/anbieter` (`.not('dateiname','is',null)` bei der Zählung) plus `/api/app-admin/eigenerklarungen` (Feld `pruefung_noetig`). **Wer eine dieser Stellen anfasst, prüft die anderen mit.**
 
