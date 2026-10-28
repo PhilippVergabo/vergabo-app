@@ -140,7 +140,9 @@ export default function BewerbungBearbeitenScreen() {
       // Bestehende, bearbeitbare Bewerbung laden
       const { data: bewerbung } = await supabase
         .from('bewerbungen')
-        .select('*')
+        // Spaltenliste statt '*': `wertung` ist dem Client entzogen (Geheimwettbewerb),
+        // ein '*' scheiterte ganz.
+        .select('id, angebotsnummer, ausfuehrungszeitraum, beschreibung, referenzen, angebotspreis_netto, verpflichtungen_bestaetigt, positionen, lv_positionen, eignungsnachweis')
         .eq('auftrag_id', id)
         .eq('anbieter_id', anbieterId)
         .in('status', ['eingereicht', 'in_pruefung'])
